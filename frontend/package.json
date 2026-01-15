@@ -1,0 +1,32 @@
+{
+  "name": "curriculum-ai-tutor-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "pdfjs-dist": "^5.4.296",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "react-pdf": "^10.3.0",
+    "react-router-dom": "^6.20.0",
+    "react-syntax-highlighter": "^16.1.0",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@types/react-pdf": "^5.0.7",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^7.3.1",
+    "vite-plugin-static-copy": "^3.1.4"
+  }
+}

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: looks_db
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-looks_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-looks_password}
+      POSTGRES_DB: ${DATABASE_NAME:-looks_db}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-looks_user} -d ${DATABASE_NAME:-looks_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - looks_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: looks_app
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql://${DATABASE_USER:-looks_user}:${DATABASE_PASSWORD:-looks_password}@db:${DATABASE_PORT:-5432}/${DATABASE_NAME:-looks_db}
+      DB_ECHO: ${DB_ECHO:-false}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+    env_file:
+      - .env  # Load additional environment variables from .env file (if it exists)
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - /app/.venv
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - looks_network
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 2 &&
+        uv run alembic upgrade head &&
+        uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:
+
+networks:
+  looks_network:
+    driver: bridge
+
