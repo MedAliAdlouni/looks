@@ -52,6 +52,7 @@ export interface ChatRequest {
   conversation_id?: string | null;
   mode?: 'strict' | 'hybrid';
   verbosity?: 'concise' | 'normal' | 'detailed';
+  stream?: boolean;
 }
 
 export interface Source {

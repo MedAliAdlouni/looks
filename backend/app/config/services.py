@@ -11,6 +11,7 @@ class ServiceConfig(BaseSettings):
     EMBEDDING_TASK_TYPE: str = "RETRIEVAL_DOCUMENT"
     EMBEDDING_BATCH_SIZE: int = 100
     EMBEDDING_MAX_RETRIES: int = 3
+    EMBEDDING_TIMEOUT: float = 120.0  # Timeout in seconds (increased from 60 to handle slow API responses)
 
     # Chunking service
     CHUNK_SMALL_SIZE: int = 400  # tokens

@@ -7,8 +7,7 @@ class AIConfig(BaseSettings):
     """AI model configurations."""
 
     # LLM Models
-    # Try newer models first, fallback handled in rag_service
-    GEMINI_MODEL: str = "gemini-1.5-flash-002"
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
 
 
     # API Keys (from environment)

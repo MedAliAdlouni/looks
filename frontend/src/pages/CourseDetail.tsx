@@ -12,19 +12,12 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { Course, Document, ChatResponse } from '../types/api';
-import {
-  PDFViewer,
-  MediaViewer,
-  ImageViewer,
-  DocxViewer,
-  PptxViewer,
-  DocumentViewer,
-} from '../components/viewers';
 import { MCQAssessment, OpenEndedAssessment } from '../components/assessments';
 import { DocumentSidebar } from '../components/course/DocumentSidebar';
 import { TopActionBar } from '../components/course/TopActionBar';
 import { UploadDropzone } from '../components/course/UploadDropzone';
 import { CourseChatAssistant } from '../components/course/CourseChatAssistant';
+import { EmbeddedCourseDocumentView } from '../components/course/EmbeddedCourseDocumentView';
 import { LoadingSpinner, Alert, Card, Tabs } from '../components/ui';
 import { theme } from '../theme';
 import type { CSSProperties } from 'react';
@@ -266,42 +259,6 @@ export default function CourseDetail() {
     );
   }
 
-  // Render document viewer if document is selected (full screen, replaces page)
-  if (selectedDocument) {
-    const viewerProps = {
-      document: selectedDocument,
-      courseId: courseId!,
-      course,
-      onClose: handleCloseDocument,
-    };
-
-    // Determine which viewer to use based on file type
-    let DocumentViewerComponent: React.ComponentType<any> | null = null;
-
-    if (['mp3', 'wav', 'mp4', 'webm'].includes(selectedDocument.file_type)) {
-      DocumentViewerComponent = MediaViewer;
-    } else if (['png', 'jpg', 'jpeg', 'svg'].includes(selectedDocument.file_type)) {
-      DocumentViewerComponent = ImageViewer;
-    } else if (['docx', 'doc'].includes(selectedDocument.file_type)) {
-      DocumentViewerComponent = DocxViewer;
-    } else if (['pptx', 'ppt'].includes(selectedDocument.file_type)) {
-      DocumentViewerComponent = PptxViewer;
-    } else if (selectedDocument.file_type === 'pdf') {
-      DocumentViewerComponent = PDFViewer;
-    } else {
-      DocumentViewerComponent = DocumentViewer;
-    }
-
-    if (DocumentViewerComponent) {
-      return (
-        <DocumentViewerComponent
-          {...viewerProps}
-          {...(selectedDocument.file_type === 'pdf' ? { documents } : {})}
-        />
-      );
-    }
-  }
-
   // Default view: No document selected - show upload dropzone and chat in main area
   return (
     <div style={containerStyle}>
@@ -326,21 +283,66 @@ export default function CourseDetail() {
               </Alert>
             </div>
           )}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-            <div style={{ flex: '0 0 auto', padding: theme.spacing.xs, borderBottom: `1px solid ${theme.colors.gray[200]}` }}>
-              <UploadDropzone onFileUpload={handleFileUpload} uploading={uploading} />
+          {selectedDocument ? (
+            // Document is open - show embedded viewer with chat sidebar
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+              <div style={{ flex: '0 0 auto', padding: theme.spacing.xs, borderBottom: `1px solid ${theme.colors.gray[200]}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${theme.spacing.sm}` }}>
+                  <span style={{ fontSize: theme.typography.fontSize.sm, color: theme.colors.text.secondary }}>
+                    Viewing: {selectedDocument.filename}
+                  </span>
+                  <button
+                    onClick={handleCloseDocument}
+                    style={{
+                      padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
+                      background: theme.colors.gray[100],
+                      color: theme.colors.text.primary,
+                      border: `1px solid ${theme.colors.gray[300]}`,
+                      borderRadius: theme.borderRadius.md,
+                      cursor: 'pointer',
+                      fontSize: theme.typography.fontSize.sm,
+                      fontWeight: theme.typography.fontWeight.medium,
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = theme.colors.gray[200];
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = theme.colors.gray[100];
+                    }}
+                  >
+                    ✕ Close Document
+                  </button>
+                </div>
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                <EmbeddedCourseDocumentView
+                  document={selectedDocument}
+                  courseId={courseId!}
+                  course={course}
+                  documents={documents}
+                  onClose={handleCloseDocument}
+                />
+              </div>
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-              <CourseChatAssistant
-                messages={messages}
-                inputMessage={inputMessage}
-                onInputChange={setInputMessage}
-                onSend={handleSendMessage}
-                sending={sending}
-                placeholder="Ask questions about this course..."
-              />
+          ) : (
+            // No document selected - show upload dropzone and chat
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+              <div style={{ flex: '0 0 auto', padding: theme.spacing.xs, borderBottom: `1px solid ${theme.colors.gray[200]}` }}>
+                <UploadDropzone onFileUpload={handleFileUpload} uploading={uploading} />
+              </div>
+              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <CourseChatAssistant
+                  messages={messages}
+                  inputMessage={inputMessage}
+                  onInputChange={setInputMessage}
+                  onSend={handleSendMessage}
+                  sending={sending}
+                  placeholder="Ask questions about this course..."
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

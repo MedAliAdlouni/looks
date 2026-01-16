@@ -190,6 +190,80 @@ class ApiClient {
     });
   }
 
+  async sendMessageStream(
+    courseId: string,
+    request: ChatRequest,
+    onChunk?: (chunk: string) => void
+  ): Promise<ChatResponse> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const url = `${API_BASE}/courses/${courseId}/chat`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMessage = error.detail || error.message || errorMessage;
+      } catch {
+        // Keep default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    // Handle SSE streaming
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let conversationId: string | null = null;
+    let sources: any[] = [];
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.chunk) {
+                fullContent += data.chunk;
+                onChunk?.(data.chunk);
+              }
+            } catch (e) {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+    }
+
+    // Return response in ChatResponse format
+    return {
+      message_id: '',
+      content: fullContent,
+      sources: sources,
+      conversation_id: conversationId || '',
+      mode: request.mode || 'strict',
+    };
+  }
+
   // Assessments
   async generateMCQs(courseId: string, request: MCQRequest): Promise<MCQListResponse> {
     return this.request<MCQListResponse>(`/courses/${courseId}/assessments/mcq/generate`, {

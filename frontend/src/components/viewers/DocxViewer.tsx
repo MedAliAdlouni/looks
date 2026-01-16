@@ -8,9 +8,10 @@ interface DocxViewerProps {
   courseId: string;
   course: Course;
   onClose: () => void;
+  variant?: 'embedded' | 'fullscreen';
 }
 
-export default function DocxViewer({ document, courseId, course, onClose }: DocxViewerProps) {
+export default function DocxViewer({ document, courseId, course, onClose, variant = 'fullscreen' }: DocxViewerProps) {
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -128,6 +129,144 @@ export default function DocxViewer({ document, courseId, course, onClose }: Docx
     }
   };
 
+  // Embedded mode: just return the core viewer
+  if (variant === 'embedded') {
+    // Enhance HTML content with better CSS if it doesn't already have a complete document structure
+    const hasCompleteDoc = htmlContent && (htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<html'));
+    const hasStyles = htmlContent && (htmlContent.includes('<style>') || htmlContent.includes('<link') || htmlContent.includes('style='));
+    
+    const enhancedHtml = htmlContent && !hasCompleteDoc
+      ? `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${!hasStyles ? `<style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 100%;
+      margin: 0;
+      padding: 2rem;
+      background: #fff;
+    }
+    p {
+      margin: 0.75rem 0;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin: 1.5rem 0 1rem 0;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; }
+    h3 { font-size: 1.25rem; }
+    ul, ol {
+      margin: 0.75rem 0;
+      padding-left: 2rem;
+    }
+    li {
+      margin: 0.5rem 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      text-align: left;
+    }
+    th {
+      background-color: #f5f5f5;
+      font-weight: 600;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+    blockquote {
+      border-left: 4px solid #667eea;
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: #666;
+      font-style: italic;
+    }
+    strong, b {
+      font-weight: 600;
+    }
+    em, i {
+      font-style: italic;
+    }
+    a {
+      color: #667eea;
+      text-decoration: underline;
+    }
+    a:hover {
+      color: #5568d3;
+    }
+  </style>
+  <script>
+    // Ensure all links open in new tab
+    (function() {
+      document.addEventListener('DOMContentLoaded', function() {
+        const links = document.querySelectorAll('a[href]');
+        links.forEach(function(link) {
+          const href = link.getAttribute('href');
+          // Only modify external links (not anchors or same-origin)
+          if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+            link.setAttribute('target', '_blank');
+            link.setAttribute('rel', 'noopener noreferrer');
+          }
+        });
+      });
+      // Also run immediately in case DOMContentLoaded already fired
+      const links = document.querySelectorAll('a[href]');
+      links.forEach(function(link) {
+        const href = link.getAttribute('href');
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          link.setAttribute('target', '_blank');
+          link.setAttribute('rel', 'noopener noreferrer');
+        }
+      });
+    })();
+  </script>` : ''}
+</head>
+<body>
+${htmlContent}
+</body>
+</html>`
+      : htmlContent;
+
+    return (
+      <div style={embeddedStyles.container}>
+        {loading ? (
+          <div style={embeddedStyles.loading}>
+            <p>Loading document...</p>
+          </div>
+        ) : error ? (
+          <div style={embeddedStyles.error}>
+            <p><strong>Error:</strong></p>
+            <p>{error}</p>
+          </div>
+        ) : (
+          <iframe
+            srcDoc={enhancedHtml}
+            style={embeddedStyles.iframe}
+            title={document.filename}
+            sandbox="allow-same-origin"
+          />
+        )}
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -748,6 +887,44 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
     boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)',
     whiteSpace: 'nowrap',
+  },
+};
+
+// Embedded mode styles
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    background: '#ffffff',
+  },
+  iframe: {
+    width: '100%',
+    height: '100%',
+    border: 'none',
+    flex: 1,
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#6b7280',
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 };
 

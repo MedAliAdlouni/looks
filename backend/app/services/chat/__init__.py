@@ -8,6 +8,7 @@ from app.services.chat.service import (
     fetch_source_metadata,
 )
 from app.services.chat.sources import format_sources_for_response, format_sources_for_db
+from app.services.chat.streaming import stream_chat_response
 
 __all__ = [
     "create_conversation",
@@ -17,4 +18,5 @@ __all__ = [
     "fetch_source_metadata",
     "format_sources_for_response",
     "format_sources_for_db",
+    "stream_chat_response",
 ]

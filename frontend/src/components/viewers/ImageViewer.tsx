@@ -7,9 +7,10 @@ interface ImageViewerProps {
   courseId: string;
   course: Course;
   onClose: () => void;
+  variant?: 'embedded' | 'fullscreen';
 }
 
-export default function ImageViewer({ document, courseId, course, onClose }: ImageViewerProps) {
+export default function ImageViewer({ document, courseId, course, onClose, variant = 'fullscreen' }: ImageViewerProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -86,6 +87,76 @@ export default function ImageViewer({ document, courseId, course, onClose }: Ima
     setPosition({ x: 0, y: 0 });
   };
 
+  // Embedded mode: just return the core viewer
+  if (variant === 'embedded') {
+    return (
+      <div style={embeddedStyles.container}>
+        <div style={embeddedStyles.controlsBar}>
+          <div style={embeddedStyles.controls}>
+            <button 
+              onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))} 
+              style={embeddedStyles.controlButton}
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span style={embeddedStyles.zoomText}>{Math.round(zoom * 100)}%</span>
+            <button 
+              onClick={() => setZoom(prev => Math.min(5, prev + 0.25))} 
+              style={embeddedStyles.controlButton}
+              title="Zoom in"
+            >
+              +
+            </button>
+            <button 
+              onClick={resetView} 
+              style={embeddedStyles.resetButton}
+              title="Reset view"
+            >
+              ↺ Reset
+            </button>
+          </div>
+        </div>
+        <div 
+          style={embeddedStyles.content}
+          onWheel={handleWheel}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {loading ? (
+            <div style={embeddedStyles.loading}>
+              <p>Loading image...</p>
+            </div>
+          ) : error ? (
+            <div style={embeddedStyles.error}>
+              <p><strong>Error:</strong></p>
+              <p>{error}</p>
+            </div>
+          ) : imageUrl ? (
+            <div
+              style={{
+                ...embeddedStyles.imageWrapper,
+                transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                transition: zoom === 1 ? 'transform 0.2s' : 'none',
+              }}
+              onMouseDown={handleMouseDown}
+            >
+              <img
+                src={imageUrl}
+                alt={document.filename}
+                style={embeddedStyles.image}
+                draggable={false}
+              />
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -368,6 +439,108 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#9ca3af',
     fontSize: '0.75rem',
     fontStyle: 'italic',
+  },
+};
+
+// Embedded mode styles
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    background: '#f9fafb',
+  },
+  controlsBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0.5rem 1rem',
+    background: '#ffffff',
+    borderBottom: '1px solid #e5e7eb',
+    flexShrink: 0,
+  },
+  controls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    background: 'rgba(102, 126, 234, 0.1)',
+    padding: '0.25rem',
+    borderRadius: '0.75rem',
+  },
+  controlButton: {
+    padding: '0.5rem 0.875rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    minWidth: '40px',
+  },
+  zoomText: {
+    minWidth: '50px',
+    textAlign: 'center',
+    fontSize: '0.875rem',
+    color: '#333',
+    fontWeight: '600',
+  },
+  resetButton: {
+    padding: '0.5rem 1rem',
+    background: 'rgba(107, 114, 128, 0.1)',
+    color: '#374151',
+    border: 'none',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    marginLeft: '0.5rem',
+  },
+  content: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '1rem',
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: 0,
+  },
+  imageWrapper: {
+    maxWidth: '100%',
+    maxHeight: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  image: {
+    maxWidth: '100%',
+    maxHeight: '100%',
+    objectFit: 'contain',
+    borderRadius: '0.5rem',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    background: 'white',
+    padding: '0.5rem',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#6b7280',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 };
 

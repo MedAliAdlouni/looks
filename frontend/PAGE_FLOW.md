@@ -264,7 +264,7 @@
 These components replace the entire page when a document is selected:
 
 - **`PDFViewer`** (`components/viewers/PDFViewer.tsx`)
-  - Full-screen PDF viewer with zoom controls
+  - Full-screen PDF viewer with zoom **controls**
   - Page navigation, text selection
   - Right sidebar with chat interface
   - Left sidebar with course navigation

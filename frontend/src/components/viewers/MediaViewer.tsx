@@ -7,9 +7,10 @@ interface MediaViewerProps {
   courseId: string;
   course: Course;
   onClose: () => void;
+  variant?: 'embedded' | 'fullscreen';
 }
 
-export default function MediaViewer({ document, courseId, course, onClose }: MediaViewerProps) {
+export default function MediaViewer({ document, courseId, course, onClose, variant = 'fullscreen' }: MediaViewerProps) {
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -52,6 +53,47 @@ export default function MediaViewer({ document, courseId, course, onClose }: Med
   const isAudio = document.file_type === 'mp3' || document.file_type === 'wav';
   const isVideo = document.file_type === 'mp4' || document.file_type === 'webm';
 
+  // Embedded mode: just return the core viewer
+  if (variant === 'embedded') {
+    return (
+      <div style={embeddedStyles.container}>
+        {loading ? (
+          <div style={embeddedStyles.loading}>
+            <p>Loading {isAudio ? 'audio' : 'video'}...</p>
+          </div>
+        ) : error ? (
+          <div style={embeddedStyles.error}>
+            <p><strong>Error:</strong></p>
+            <p>{error}</p>
+          </div>
+        ) : mediaUrl ? (
+          <div style={embeddedStyles.mediaContainer}>
+            {isAudio ? (
+              <audio
+                controls
+                autoPlay
+                style={embeddedStyles.audio}
+                src={mediaUrl}
+              >
+                Your browser does not support the audio element.
+              </audio>
+            ) : (
+              <video
+                controls
+                autoPlay
+                style={embeddedStyles.video}
+                src={mediaUrl}
+              >
+                Your browser does not support the video element.
+              </video>
+            )}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -243,6 +285,57 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     color: '#6b7280',
     fontSize: '0.875rem',
+  },
+};
+
+// Embedded mode styles
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    background: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mediaContainer: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '1rem',
+  },
+  audio: {
+    width: '100%',
+    height: '60px',
+    borderRadius: '0.5rem',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    maxHeight: '100%',
+    borderRadius: '0.5rem',
+    background: '#000',
+    objectFit: 'contain',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#ffffff',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 };
 

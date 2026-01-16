@@ -7,9 +7,10 @@ interface DocumentViewerProps {
   courseId: string;
   course: Course;
   onClose: () => void;
+  variant?: 'embedded' | 'fullscreen';
 }
 
-export default function DocumentViewer({ document, courseId, course, onClose }: DocumentViewerProps) {
+export default function DocumentViewer({ document, courseId, course, onClose, variant = 'fullscreen' }: DocumentViewerProps) {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -73,6 +74,45 @@ export default function DocumentViewer({ document, courseId, course, onClose }: 
     return typeMap[fileType] || 'Document';
   };
 
+  // Embedded mode: just return the core viewer
+  if (variant === 'embedded') {
+    return (
+      <div style={embeddedStyles.container}>
+        {loading ? (
+          <div style={embeddedStyles.loading}>
+            <p>Loading document...</p>
+          </div>
+        ) : error ? (
+          <div style={embeddedStyles.error}>
+            <p><strong>Error:</strong></p>
+            <p>{error}</p>
+          </div>
+        ) : (
+          <div style={embeddedStyles.documentContainer}>
+            <div style={embeddedStyles.documentInfo}>
+              <div style={embeddedStyles.documentIcon}>
+                {document.file_type === 'docx' || document.file_type === 'doc' ? '📝' :
+                 document.file_type === 'pptx' || document.file_type === 'ppt' ? '📊' :
+                 document.file_type === 'txt' || document.file_type === 'rtf' ? '📃' :
+                 document.file_type === 'csv' || document.file_type === 'xlsx' || document.file_type === 'xls' ? '📈' : '📄'}
+              </div>
+              <h3 style={embeddedStyles.documentTitle}>{document.filename}</h3>
+              <p style={embeddedStyles.documentType}>{getFileTypeName(document.file_type)}</p>
+              <div style={embeddedStyles.documentMeta}>
+                <span>📑 {document.num_pages} {document.num_pages === 1 ? 'page' : 'pages'}</span>
+                <span>💾 {(document.file_size / 1024).toFixed(2)} KB</span>
+              </div>
+              <button onClick={handleDownload} style={embeddedStyles.downloadButton}>
+                📥 Download File
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -297,6 +337,83 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: '1.6',
     textAlign: 'left',
     maxWidth: '600px',
+  },
+};
+
+// Embedded mode styles
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'auto',
+    background: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '2rem',
+  },
+  documentContainer: {
+    width: '100%',
+    maxWidth: '800px',
+    textAlign: 'center',
+  },
+  documentInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1rem',
+  },
+  documentIcon: {
+    fontSize: '4rem',
+    marginBottom: '0.5rem',
+  },
+  documentTitle: {
+    margin: '0 0 0.5rem 0',
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    color: '#111827',
+  },
+  documentType: {
+    margin: '0 0 1rem 0',
+    color: '#6b7280',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+  },
+  documentMeta: {
+    display: 'flex',
+    gap: '1.5rem',
+    marginBottom: '1.5rem',
+    color: '#6b7280',
+    fontSize: '0.875rem',
+  },
+  downloadButton: {
+    padding: '0.75rem 1.5rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.75rem',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    boxShadow: '0 4px 6px -1px rgba(102, 126, 234, 0.3)',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#6b7280',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
   },
 };
 

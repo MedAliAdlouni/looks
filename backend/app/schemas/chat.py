@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
     mode: Optional[str] = "strict"  # "strict" or "hybrid"
     verbosity: Optional[str] = "normal"  # "concise", "normal", or "detailed"
+    stream: Optional[bool] = False  # Enable streaming response
 
 
 # ------------------------------------------------------------

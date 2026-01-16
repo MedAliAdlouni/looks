@@ -8,6 +8,7 @@ interface PptxViewerProps {
   courseId: string;
   course: Course;
   onClose: () => void;
+  variant?: 'embedded' | 'fullscreen';
 }
 
 interface Slide {
@@ -18,11 +19,18 @@ interface Slide {
   shapes: Array<{ type: number; text: string }>;
 }
 
-export default function PptxViewer({ document, courseId, course, onClose }: PptxViewerProps) {
+export default function PptxViewer({ document, courseId, course, onClose, variant = 'fullscreen' }: PptxViewerProps) {
   const [slides, setSlides] = useState<Slide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  
+  // Ensure currentSlide is within bounds when slides change
+  useEffect(() => {
+    if (slides.length > 0 && currentSlide >= slides.length) {
+      setCurrentSlide(0);
+    }
+  }, [slides, currentSlide]);
   
   // Chat state
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[]; mode?: 'strict' | 'hybrid' }>>([]);
@@ -177,6 +185,77 @@ export default function PptxViewer({ document, courseId, course, onClose }: Pptx
 
   const slide = slides[currentSlide];
 
+  // Embedded mode: just return the core viewer
+  if (variant === 'embedded') {
+    return (
+      <div style={embeddedStyles.container}>
+        {loading ? (
+          <div style={embeddedStyles.loading}>
+            <p>Loading presentation...</p>
+          </div>
+        ) : error ? (
+          <div style={embeddedStyles.error}>
+            <p><strong>Error:</strong></p>
+            <p>{error}</p>
+          </div>
+        ) : slides.length === 0 ? (
+          <div style={embeddedStyles.error}>
+            <p>No slides found in this presentation.</p>
+          </div>
+        ) : slide ? (
+          <>
+            <div style={embeddedStyles.slideContainer}>
+              <div style={embeddedStyles.slide}>
+                <h1 style={embeddedStyles.slideTitle}>{slide.title || `Slide ${currentSlide + 1}`}</h1>
+                <div style={embeddedStyles.slideContent}>
+                  {slide.text_content && slide.text_content.length > 0 ? (
+                    slide.text_content.map((text, idx) => (
+                      <p key={idx} style={embeddedStyles.slideText}>{text}</p>
+                    ))
+                  ) : (
+                    <p style={embeddedStyles.slideTextEmpty}>No text content on this slide</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            {slides.length > 1 && (
+              <div style={embeddedStyles.controlsBar}>
+                <button 
+                  onClick={prevSlide} 
+                  disabled={currentSlide === 0}
+                  style={{
+                    ...embeddedStyles.navButton,
+                    ...(currentSlide === 0 ? embeddedStyles.navButtonDisabled : {}),
+                  }}
+                >
+                  ←
+                </button>
+                <span style={embeddedStyles.slideCounter}>
+                  {slides.length > 0 ? `${currentSlide + 1} / ${slides.length}` : '0 / 0'}
+                </span>
+                <button 
+                  onClick={nextSlide} 
+                  disabled={currentSlide === slides.length - 1}
+                  style={{
+                    ...embeddedStyles.navButton,
+                    ...(currentSlide === slides.length - 1 ? embeddedStyles.navButtonDisabled : {}),
+                  }}
+                >
+                  →
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={embeddedStyles.error}>
+            <p>Unable to load slide content.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -953,6 +1032,129 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
     boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)',
     whiteSpace: 'nowrap',
+  },
+};
+
+// Embedded mode styles
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    background: '#ffffff',
+  },
+  slideContainer: {
+    flex: 1,
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: 0,
+    padding: '1rem',
+    overflow: 'auto',
+  },
+  slide: {
+    width: '100%',
+    maxWidth: '1200px',
+    aspectRatio: '16/9',
+    background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+    borderRadius: '0.5rem',
+    padding: '3rem 4rem',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    overflow: 'auto',
+    border: '1px solid #e5e7eb',
+    position: 'relative',
+  },
+  slideTitle: {
+    margin: '0 0 2rem 0',
+    fontSize: '2.5rem',
+    fontWeight: '700',
+    color: '#111827',
+    borderBottom: '4px solid #667eea',
+    paddingBottom: '1rem',
+    lineHeight: '1.2',
+    letterSpacing: '-0.02em',
+  },
+  slideContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1.25rem',
+    paddingTop: '0.5rem',
+  },
+  slideText: {
+    margin: 0,
+    fontSize: '1.5rem',
+    lineHeight: '1.7',
+    color: '#374151',
+    fontWeight: '400',
+  },
+  slideTextEmpty: {
+    margin: 0,
+    fontSize: '1rem',
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  controlsBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '0.75rem',
+    background: '#f9fafb',
+    borderTop: '1px solid #e5e7eb',
+    flexShrink: 0,
+  },
+  navButton: {
+    padding: '0.5rem 1rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    minWidth: '50px',
+  },
+  navButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  slideCounter: {
+    minWidth: '100px',
+    textAlign: 'center',
+    fontSize: '0.875rem',
+    color: '#333',
+    fontWeight: '600',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#6b7280',
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    textAlign: 'center',
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 };
 

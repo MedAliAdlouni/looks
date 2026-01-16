@@ -6,6 +6,7 @@ import { apiClient } from '../../api/client';
 import type { Document as DocumentType, ChatResponse } from '../../types/api';
 import type { Course } from '../../types/api';
 import { MarkdownMessage, CourseNavigationSidebar } from '../shared';
+import { theme } from '../../theme';
 
 // Set up PDF.js worker
 // Import the worker from pdfjs-dist package (version 5.4.296 matches react-pdf)
@@ -18,9 +19,10 @@ interface PDFViewerProps {
   course: Course;
   onClose: () => void;
   documents?: DocumentType[]; // For material outline
+  variant?: 'embedded' | 'fullscreen'; // New prop for embedded vs fullscreen mode
 }
 
-export default function PDFViewer({ document, courseId, course, onClose, documents = [] }: PDFViewerProps) {
+export default function PDFViewer({ document, courseId, course, onClose, documents = [], variant = 'fullscreen' }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState<number>(1.2);
   const [loading, setLoading] = useState(true);
@@ -659,9 +661,165 @@ export default function PDFViewer({ document, courseId, course, onClose, documen
     pdfBlobUrl: !!pdfBlobUrl, 
     numPages, 
     loading, 
-    error 
+    error,
+    variant
   });
 
+  // Core PDF viewer content (used in both embedded and fullscreen modes)
+  const pdfViewerContent = (
+    <div 
+      ref={pdfContainerRef}
+      style={{ 
+        ...(variant === 'embedded' ? embeddedStyles.pdfContainer : styles.pdfContainer),
+        width: variant === 'embedded' 
+          ? '100%'
+          : sidebarOpen 
+            ? `calc(100% - ${navSidebarCollapsed ? 40 : navSidebarWidth}px - ${sidebarWidth}px)` 
+            : `calc(100% - ${navSidebarCollapsed ? 40 : navSidebarWidth}px)`,
+        position: 'relative',
+      }}
+    >
+      {/* Floating "Add to Chat" Button */}
+      {showAddToChatButton && buttonPosition && selectedText && (
+        <div
+          style={{
+            ...styles.addToChatButton,
+            top: `${Math.max(10, buttonPosition.top)}px`,
+            left: `${Math.max(10, Math.min(buttonPosition.left, (pdfContainerRef.current?.clientWidth || 800) - 120))}px`,
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            addTextToChat(selectedText);
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#0056b3';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = '#007bff';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          <span style={styles.addToChatIcon}>+</span>
+          Add to chat
+        </div>
+      )}
+      <div style={variant === 'embedded' ? embeddedStyles.pdfWrapper : styles.pdfWrapper}>
+        {loading && !pdfBlobUrl ? (
+          <div style={variant === 'embedded' ? embeddedStyles.loading : styles.loading}>
+            <p>Loading PDF...</p>
+            <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Please wait</p>
+          </div>
+        ) : error && !pdfBlobUrl ? (
+          <div style={variant === 'embedded' ? embeddedStyles.error : styles.error}>
+            <p><strong>Error loading PDF:</strong></p>
+            <p>{error}</p>
+            {variant === 'fullscreen' && (
+              <button onClick={onClose} style={styles.closeButton}>Close</button>
+            )}
+          </div>
+        ) : pdfBlobUrl ? (
+          <>
+            <Document
+              file={pdfBlobUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              onLoadError={onDocumentLoadError}
+              loading={
+                <div style={variant === 'embedded' ? embeddedStyles.loading : styles.loading}>
+                  <p>Loading PDF document...</p>
+                  <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>This may take a moment</p>
+                </div>
+              }
+              error={
+                <div style={variant === 'embedded' ? embeddedStyles.error : styles.error}>
+                  <p><strong>Error rendering PDF:</strong></p>
+                  <p>Please try again or contact support if the problem persists.</p>
+                </div>
+              }
+            >
+            {numPages > 0 ? (
+              Array.from(new Array(numPages), (el, index) => (
+                <div 
+                  key={`page_${index + 1}`} 
+                  data-page-number={index + 1} 
+                  style={{
+                    ...styles.pageWrapper,
+                    // Keep pages visible during zoom by preventing re-render flicker
+                    opacity: isZooming ? 0.95 : 1,
+                    transition: isZooming ? 'none' : 'opacity 0.2s',
+                  }}
+                >
+                  <Page
+                    pageNumber={index + 1}
+                    scale={scale}
+                    renderTextLayer={!isZooming}
+                    renderAnnotationLayer={!isZooming}
+                    loading={
+                      <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                        Loading page {index + 1}...
+                      </div>
+                    }
+                    error={
+                      <div style={variant === 'embedded' ? embeddedStyles.error : styles.error}>
+                        Failed to load page {index + 1}
+                      </div>
+                    }
+                  />
+                </div>
+              ))
+            ) : (
+                <div style={variant === 'embedded' ? embeddedStyles.loading : styles.loading}>
+                  <p>Loading pages...</p>
+                  <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Detecting page count</p>
+                </div>
+              )}
+            </Document>
+            {error && <div style={variant === 'embedded' ? embeddedStyles.error : styles.error}>{error}</div>}
+          </>
+        ) : (
+          <div style={variant === 'embedded' ? embeddedStyles.loading : styles.loading}>
+            <p>Preparing PDF...</p>
+            <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Initializing</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Embedded mode: just return the core viewer with minimal controls
+  if (variant === 'embedded') {
+    return (
+      <div style={embeddedStyles.container}>
+        {/* Minimal controls bar for embedded mode */}
+        <div style={embeddedStyles.controlsBar}>
+          <div style={embeddedStyles.controls}>
+            <button 
+              onClick={() => setScale(prev => Math.max(0.5, prev - 0.2))} 
+              style={embeddedStyles.controlButton} 
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span style={embeddedStyles.scaleText}>{Math.round(scale * 100)}%</span>
+            <button 
+              onClick={() => setScale(prev => Math.min(2, prev + 0.2))} 
+              style={embeddedStyles.controlButton} 
+              title="Zoom in"
+            >
+              +
+            </button>
+          </div>
+          <span style={embeddedStyles.pageInfo}>
+            {numPages > 0 ? `${numPages} pages` : 'Loading...'}
+          </span>
+        </div>
+        {pdfViewerContent}
+      </div>
+    );
+  }
+
+  // Fullscreen mode: return the full UI with header, navigation, and chat
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -772,120 +930,7 @@ export default function PDFViewer({ document, courseId, course, onClose, documen
         />
 
         {/* PDF Viewer */}
-        <div 
-          ref={pdfContainerRef}
-          style={{ 
-            ...styles.pdfContainer,
-            width: sidebarOpen 
-              ? `calc(100% - ${navSidebarCollapsed ? 40 : navSidebarWidth}px - ${sidebarWidth}px)` 
-              : `calc(100% - ${navSidebarCollapsed ? 40 : navSidebarWidth}px)`,
-            position: 'relative',
-          }}
-        >
-          {/* Floating "Add to Chat" Button */}
-          {showAddToChatButton && buttonPosition && selectedText && (
-            <div
-              style={{
-                ...styles.addToChatButton,
-                top: `${Math.max(10, buttonPosition.top)}px`,
-                left: `${Math.max(10, Math.min(buttonPosition.left, (pdfContainerRef.current?.clientWidth || 800) - 120))}px`,
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                addTextToChat(selectedText);
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#0056b3';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#007bff';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              <span style={styles.addToChatIcon}>+</span>
-              Add to chat
-            </div>
-          )}
-          <div style={styles.pdfWrapper}>
-            {loading && !pdfBlobUrl ? (
-              <div style={styles.loading}>
-                <p>Loading PDF...</p>
-                <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Please wait</p>
-              </div>
-            ) : error && !pdfBlobUrl ? (
-              <div style={styles.error}>
-                <p><strong>Error loading PDF:</strong></p>
-                <p>{error}</p>
-                <button onClick={onClose} style={styles.closeButton}>Close</button>
-              </div>
-            ) : pdfBlobUrl ? (
-              <>
-                <Document
-                  file={pdfBlobUrl}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  onLoadError={onDocumentLoadError}
-                  loading={
-                    <div style={styles.loading}>
-                      <p>Loading PDF document...</p>
-                      <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>This may take a moment</p>
-                    </div>
-                  }
-                  error={
-                    <div style={styles.error}>
-                      <p><strong>Error rendering PDF:</strong></p>
-                      <p>Please try again or contact support if the problem persists.</p>
-                    </div>
-                  }
-                >
-                {numPages > 0 ? (
-                  Array.from(new Array(numPages), (el, index) => (
-                    <div 
-                      key={`page_${index + 1}`} 
-                      data-page-number={index + 1} 
-                      style={{
-                        ...styles.pageWrapper,
-                        // Keep pages visible during zoom by preventing re-render flicker
-                        opacity: isZooming ? 0.95 : 1,
-                        transition: isZooming ? 'none' : 'opacity 0.2s',
-                      }}
-                    >
-                      <Page
-                        pageNumber={index + 1}
-                        scale={scale}
-                        renderTextLayer={!isZooming}
-                        renderAnnotationLayer={!isZooming}
-                        loading={
-                          <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
-                            Loading page {index + 1}...
-                          </div>
-                        }
-                        error={
-                          <div style={styles.error}>
-                            Failed to load page {index + 1}
-                          </div>
-                        }
-                      />
-                    </div>
-                  ))
-                ) : (
-                    <div style={styles.loading}>
-                      <p>Loading pages...</p>
-                      <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Detecting page count</p>
-                    </div>
-                  )}
-                </Document>
-                {error && <div style={styles.error}>{error}</div>}
-              </>
-            ) : (
-              <div style={styles.loading}>
-                <p>Preparing PDF...</p>
-                <p style={{ fontSize: '0.875rem', color: '#999', marginTop: '0.5rem' }}>Initializing</p>
-              </div>
-            )}
-          </div>
-        </div>
+        {pdfViewerContent}
 
         {/* Chat Sidebar */}
         {sidebarOpen && (
@@ -1543,6 +1588,98 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.2s',
     boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)',
     whiteSpace: 'nowrap',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '3rem 2rem',
+    color: '#6b7280',
+    background: 'rgba(255, 255, 255, 0.95)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: '1rem',
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    minWidth: '300px',
+    margin: '2rem',
+  },
+  error: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    color: '#dc2626',
+    padding: '1.25rem',
+    borderRadius: '0.75rem',
+    margin: '1rem',
+    border: '1px solid #fca5a5',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+  },
+};
+
+// Embedded mode styles (simpler, no full-screen wrapper)
+const embeddedStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    width: '100%',
+    overflow: 'hidden',
+    background: theme.colors.background.primary,
+  },
+  controlsBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '0.5rem 1rem',
+    background: theme.colors.background.overlay,
+    borderBottom: `1px solid ${theme.colors.gray[200]}`,
+    flexShrink: 0,
+  },
+  controls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    background: 'rgba(102, 126, 234, 0.1)',
+    padding: '0.25rem',
+    borderRadius: '0.75rem',
+  },
+  controlButton: {
+    padding: '0.5rem 0.875rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+    minWidth: '40px',
+  },
+  scaleText: {
+    minWidth: '50px',
+    textAlign: 'center',
+    fontSize: '0.875rem',
+    color: '#333',
+  },
+  pageInfo: {
+    color: '#6b7280',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+  },
+  pdfContainer: {
+    flex: 1,
+    overflow: 'auto',
+    background: theme.colors.gray[100],
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    padding: '1rem',
+    minHeight: 0,
+    minWidth: 0,
+  },
+  pdfWrapper: {
+    width: '100%',
+    minWidth: '300px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    position: 'relative',
   },
   loading: {
     textAlign: 'center',

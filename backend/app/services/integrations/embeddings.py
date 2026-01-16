@@ -68,17 +68,19 @@ async def create_embedding(text: str) -> List[float]:
     
     try:
         loop = asyncio.get_running_loop()
-        # Set timeout to 60 seconds for embedding (increased for reliability)
+        # Use configurable timeout for embedding API calls
         # The API call itself might be slow, so we give it more time
+        timeout = service_config.EMBEDDING_TIMEOUT
         embeddings = await asyncio.wait_for(
             loop.run_in_executor(None, _embed_batch_sync, [text]),
-            timeout=60.0
+            timeout=timeout
         )
         logger.info("Embedding generated successfully")
         return embeddings[0]  # Return first (and only) embedding
     except asyncio.TimeoutError:
-        logger.error("Embedding API call timed out after 60 seconds - this may indicate network issues or API problems")
-        raise RuntimeError("Embedding generation timed out. Please check your network connection and API key, then try again.")
+        timeout = service_config.EMBEDDING_TIMEOUT
+        logger.error(f"Embedding API call timed out after {timeout} seconds - this may indicate network issues or API problems")
+        raise RuntimeError(f"Embedding generation timed out after {timeout} seconds. Please check your network connection and API key, then try again.")
     except ValueError as e:
         if "GEMINI_API_KEY" in str(e):
             logger.error("GEMINI_API_KEY is not configured")
@@ -103,7 +105,11 @@ async def create_embeddings_batch(chunks: List[Dict]) -> List[Dict]:
         try:
             # Pass all texts in a single API call
             loop = asyncio.get_running_loop()
-            embeddings = await loop.run_in_executor(None, _embed_batch_sync, texts)
+            timeout = service_config.EMBEDDING_TIMEOUT
+            embeddings = await asyncio.wait_for(
+                loop.run_in_executor(None, _embed_batch_sync, texts),
+                timeout=timeout
+            )
             
             # Map embeddings back to chunk IDs
             for chunk, embedding in zip(batch, embeddings):
@@ -111,6 +117,10 @@ async def create_embeddings_batch(chunks: List[Dict]) -> List[Dict]:
                     "chunk_id": chunk["chunk_id"],
                     "embedding": embedding,
                 })
+        except asyncio.TimeoutError:
+            timeout = service_config.EMBEDDING_TIMEOUT
+            logger.error(f"Batch embedding API call timed out after {timeout} seconds")
+            raise RuntimeError(f"Batch embedding generation timed out after {timeout} seconds. Please check your network connection and API key, then try again.")
         except Exception as e:
             logger.error(f"Error creating batch embeddings: {str(e)}")
             raise
