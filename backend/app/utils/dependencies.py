@@ -1,6 +1,7 @@
 """FastAPI dependencies."""
 
-from fastapi import Depends, HTTPException, status
+import uuid
+from fastapi import Depends, HTTPException, status, Path
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
@@ -32,3 +33,26 @@ async def get_current_user(
         )
 
     return user
+
+
+def validate_uuid(uuid_str: str, param_name: str = "ID") -> uuid.UUID:
+    """
+    Validate and convert a UUID string to UUID object.
+    
+    Args:
+        uuid_str: UUID string to validate
+        param_name: Name of the parameter for error messages
+        
+    Returns:
+        UUID object
+        
+    Raises:
+        HTTPException: If UUID format is invalid
+    """
+    try:
+        return uuid.UUID(uuid_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid {param_name} format"
+        )

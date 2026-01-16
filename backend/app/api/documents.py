@@ -15,16 +15,16 @@ from app.models.document import Document
 from app.schemas.document import DocumentResponse
 from app.utils.dependencies import get_current_user
 from app.config.api import api_config
-from app.services.file_extraction_service import (
+from app.services.documents import (
     get_file_type,
     is_text_processable,
     is_media_file,
     is_image_file,
     extract_text_from_file,
 )
-from app.services.chunking_service import chunk_text_parent_child, save_chunks_to_db
-from app.services.embedding_service import create_embeddings_batch
-from app.services.vector_service import store_vectors
+from app.services.chunking import chunk_text_parent_child, save_chunks_to_db
+from app.services.integrations.embeddings import create_embeddings_batch
+from app.services.integrations.pinecone_store import store_vectors
 import logging
 
 logger = logging.getLogger(__name__)

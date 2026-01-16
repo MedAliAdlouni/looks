@@ -4,26 +4,25 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
-import uuid
 from app.db import get_db
 from app.models.user import User
 from app.models.course import Course
-from app.models.document import Document
-from app.models.chunk import Chunk
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     MessageResponse,
     ConversationResponse,
-    Source,
 )
-from app.utils.dependencies import get_current_user
-from app.services.rag_service import answer_question
-from app.services.chat_service import (
+from app.utils.dependencies import get_current_user, validate_uuid
+from app.services.rag import answer_question
+from app.services.chat import (
     create_conversation,
     get_conversation,
     get_conversation_messages,
     save_message,
+    fetch_source_metadata,
+    format_sources_for_response,
+    format_sources_for_db,
 )
 import logging
 
@@ -40,12 +39,7 @@ async def chat(
     db: AsyncSession = Depends(get_db),
 ):
     """Send a message and get AI response."""
-    try:
-        course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid course ID format"
-        )
+    course_uuid = validate_uuid(course_id, "course ID")
 
     # Verify course exists and user owns it
     result = await db.execute(select(Course).where(Course.id == course_uuid))
@@ -64,17 +58,8 @@ async def chat(
 
     # Get or create conversation
     if request.conversation_id:
-        # Validate conversation_id is a valid UUID
         try:
-            conv_uuid = uuid.UUID(request.conversation_id)
-        except ValueError:
-            # Invalid UUID format, treat as new conversation
-            logger.warning(
-                f"Invalid conversation_id format: {request.conversation_id}. Creating new conversation."
-            )
-            title = request.message[:50] if len(request.message) > 50 else request.message
-            conversation = await create_conversation(str(course_uuid), title, db)
-        else:
+            validate_uuid(request.conversation_id, "conversation ID")
             conversation = await get_conversation(request.conversation_id, db)
             if conversation is None:
                 raise HTTPException(
@@ -85,6 +70,13 @@ async def chat(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Conversation does not belong to this course",
                 )
+        except HTTPException:
+            # Invalid UUID format, treat as new conversation
+            logger.warning(
+                f"Invalid conversation_id format: {request.conversation_id}. Creating new conversation."
+            )
+            title = request.message[:50] if len(request.message) > 50 else request.message
+            conversation = await create_conversation(str(course_uuid), title, db)
     else:
         # Create new conversation with first message as title
         title = request.message[:50] if len(request.message) > 50 else request.message
@@ -110,82 +102,29 @@ async def chat(
         rag_result = await answer_question(str(course_uuid), request.message, mode=mode, verbosity=verbosity)
         answer = rag_result["answer"]
         sources = rag_result["sources"]
-    except Exception as e:
+    except RuntimeError as e:
         logger.error(f"Error in RAG pipeline: {str(e)}", exc_info=True)
-        # Temporary: return error for debugging (remove in production)
-        answer = f"Error: {str(e)}"
-        sources = []
-
-    # Fetch document names for all unique document_ids
-    document_ids = list(set([src.get("document_id", "") for src in sources if src.get("document_id") and src.get("document_id").strip()]))
-    document_map = {}
-    if document_ids:
-        try:
-            # Filter out empty strings and convert to UUIDs
-            valid_uuids = []
-            for doc_id in document_ids:
-                try:
-                    valid_uuids.append(uuid.UUID(doc_id))
-                except (ValueError, AttributeError):
-                    logger.warning(f"Invalid document_id format: {doc_id}")
-                    continue
-            
-            if valid_uuids:
-                result = await db.execute(
-                    select(Document).where(Document.id.in_(valid_uuids))
-                )
-                documents = result.scalars().all()
-                document_map = {str(doc.id): doc.filename for doc in documents}
-        except Exception as e:
-            logger.warning(f"Error fetching document names: {str(e)}")
-
-    # Fetch full chunk content for all chunks
-    chunk_ids = [src.get("chunk_id", "") for src in sources if src.get("chunk_id")]
-    chunk_map = {}
-    if chunk_ids:
-        try:
-            valid_chunk_uuids = []
-            for chunk_id in chunk_ids:
-                try:
-                    valid_chunk_uuids.append(uuid.UUID(chunk_id))
-                except (ValueError, AttributeError):
-                    logger.warning(f"Invalid chunk_id format: {chunk_id}")
-                    continue
-            
-            if valid_chunk_uuids:
-                result = await db.execute(
-                    select(Chunk).where(Chunk.id.in_(valid_chunk_uuids))
-                )
-                chunks = result.scalars().all()
-                chunk_map = {str(chunk.id): chunk.content for chunk in chunks}
-        except Exception as e:
-            logger.warning(f"Error fetching chunk content: {str(e)}")
-
-    # Format sources for response - use full chunk content from database
-    source_list = [
-        Source(
-            page=src["page"],
-            chunk_id=src["chunk_id"],
-            similarity=src["similarity"],
-            document_id=src.get("document_id", ""),
-            document_name=document_map.get(src.get("document_id", ""), "Unknown Document"),
-            chunk_text=chunk_map.get(src.get("chunk_id", ""), src.get("text", ""))  # Use full chunk content
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate response: {str(e)}"
         )
-        for src in sources
-    ]
+    except Exception as e:
+        logger.error(f"Unexpected error in RAG pipeline: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while generating the response"
+        )
 
-    # Format sources for database (JSONB)
-    sources_db = [
-        {
-            "page": src["page"],
-            "chunk_id": src["chunk_id"],
-            "similarity": float(src["similarity"]),
-            "document_id": src.get("document_id", ""),
-            "document_name": document_map.get(src.get("document_id", ""), "Unknown Document"),
-            "chunk_text": chunk_map.get(src.get("chunk_id", ""), src.get("text", "")),
-        }
-        for src in sources
-    ]
+    # Fetch document names and chunk content in a single batch (fixes N+1 query)
+    try:
+        document_map, chunk_map = await fetch_source_metadata(sources, db)
+    except Exception as e:
+        logger.warning(f"Error fetching source metadata: {str(e)}")
+        document_map, chunk_map = {}, {}
+
+    # Format sources for response and database
+    source_list = format_sources_for_response(sources, document_map, chunk_map)
+    sources_db = format_sources_for_db(sources, document_map, chunk_map)
 
     # Save assistant message
     assistant_message = await save_message(
@@ -210,13 +149,7 @@ async def get_messages(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all messages in a conversation."""
-    try:
-        conv_uuid = uuid.UUID(conversation_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid conversation ID format",
-        )
+    validate_uuid(conversation_id, "conversation ID")
 
     # Get conversation and verify ownership
     conversation = await get_conversation(conversation_id, db)
@@ -259,12 +192,7 @@ async def get_conversations(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all conversations for a course."""
-    try:
-        course_uuid = uuid.UUID(course_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid course ID format"
-        )
+    course_uuid = validate_uuid(course_id, "course ID")
 
     # Verify course exists and user owns it
     result = await db.execute(select(Course).where(Course.id == course_uuid))

@@ -45,11 +45,11 @@ async def startup_event():
     
     # Initialize Pinecone index at startup to avoid first-request delay
     try:
-        from app.services.vector_service import _initialize_index
+        from app.services.integrations.pinecone_store import init_index
         import asyncio
         # Run initialization in executor since it may have blocking calls
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _initialize_index)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, init_index)
         logger.info("Pinecone index initialized successfully")
     except Exception as e:
         logger.warning(f"Failed to initialize Pinecone index at startup: {e}")

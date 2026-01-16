@@ -62,7 +62,7 @@ async def view_docx(
         )
 
     try:
-        from app.services.docx_viewer_service import convert_docx_to_html
+        from app.services.documents.viewers.docx_html import convert_docx_to_html
         
         html_content = convert_docx_to_html(document.file_path)
         return HTMLResponse(content=html_content)
@@ -118,7 +118,7 @@ async def view_pptx(
         )
 
     try:
-        from app.services.pptx_viewer_service import extract_pptx_slides
+        from app.services.documents.viewers.pptx_slides import extract_pptx_slides
         
         slides = extract_pptx_slides(document.file_path)
         return JSONResponse(content={

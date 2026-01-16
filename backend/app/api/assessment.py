@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
 import uuid
 import logging
 
@@ -44,7 +43,7 @@ async def test_api_status(
     Returns API connection status and any errors.
     """
     try:
-        from app.services.rag_service import get_gemini_client
+        from app.services.integrations.gemini_client import get_gemini_client
         from google.genai import types
         from google.genai.errors import ClientError
         

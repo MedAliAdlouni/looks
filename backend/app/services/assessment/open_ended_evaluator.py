@@ -12,9 +12,9 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ClientError
 
-from app.services.embedding_service import create_embedding
-from app.services.vector_service import query_vectors
-from app.services.rag_service import get_gemini_client
+from app.services.integrations.embeddings import create_embedding
+from app.services.integrations.pinecone_store import query_vectors
+from app.services.integrations.gemini_client import get_gemini_client
 from app.config.ai import ai_config
 from app.config.services import service_config
 from app.services.assessment.prompts import (
@@ -208,7 +208,7 @@ def _generate_content_sync(prompt: str) -> str:
     Tries JSON response first, falls back to text if JSON not supported.
     Uses same model selection logic as RAG service.
     """
-    from app.services.rag_service import _list_available_models
+    from app.services.integrations.gemini_client import list_available_models
     
     primary_model = ai_config.GEMINI_MODEL
     primary_variants = [primary_model]
@@ -272,7 +272,7 @@ def _generate_content_sync(prompt: str) -> str:
     fallback_models = []
     
     # First, try to use cached available models
-    available_models = _list_available_models()
+    available_models = list_available_models()
     if available_models:
         # Extract model names (remove "models/" prefix if present)
         clean_available = []

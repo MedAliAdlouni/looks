@@ -307,3 +307,4 @@ Done! Your database now has the preferences table.
 
 Migrations ensure your database schema stays in sync with your code and can be versioned, reviewed, and rolled back just like your code!
 
+
