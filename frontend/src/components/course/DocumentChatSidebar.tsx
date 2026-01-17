@@ -74,8 +74,11 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
   const [streaming, setStreaming] = useState<boolean>(true);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
   const [conversationListOpen, setConversationListOpen] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const loadingStatusIntervalRef = useRef<number | null>(null);
+  const loadingStatusIndexRef = useRef<number>(0);
 
   // Sync width with parent if provided
   useEffect(() => {
@@ -87,6 +90,34 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Inject CSS keyframes for loading spinner animation
+  useEffect(() => {
+    const styleId = 'chat-loading-spinner-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    return () => {
+      // Cleanup on unmount is optional - keeping styles for reuse
+    };
+  }, []);
+
+  // Cleanup loading interval on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingStatusIntervalRef.current !== null) {
+        clearInterval(loadingStatusIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Handle sidebar resizing
   useEffect(() => {
@@ -131,6 +162,41 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
     
     setSending(true);
 
+    // Start progressive loading indicators with sequential, non-cycling logic
+    const loadingStatuses = [
+      'Searching course documents…',
+      'Retrieving relevant information…',
+      'Thinking…',
+      'Generating response…',
+    ];
+    const finalStatusIndex = loadingStatuses.length - 1; // Index of "Generating response…"
+    
+    // Reset status index
+    loadingStatusIndexRef.current = 0;
+    setLoadingStatus(loadingStatuses[0]);
+
+    const startLoadingStatus = () => {
+      loadingStatusIntervalRef.current = window.setInterval(() => {
+        // Only advance if not at the final status
+        if (loadingStatusIndexRef.current < finalStatusIndex) {
+          loadingStatusIndexRef.current += 1;
+          setLoadingStatus(loadingStatuses[loadingStatusIndexRef.current]);
+        }
+        // Once at "Generating response…", stay there until content arrives
+      }, 800); // Change status every 800ms
+    };
+
+    const stopLoadingStatus = () => {
+      if (loadingStatusIntervalRef.current !== null) {
+        clearInterval(loadingStatusIntervalRef.current);
+        loadingStatusIntervalRef.current = null;
+      }
+      setLoadingStatus(null);
+      loadingStatusIndexRef.current = 0; // Reset for next message
+    };
+
+    startLoadingStatus();
+
     try {
       if (streaming) {
         // Streaming response - create placeholder message
@@ -138,6 +204,7 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
         addMessage(placeholderMsg);
 
         let fullContent = '';
+        let hasReceivedContent = false;
 
         // Stream chunks and update message in real-time
         const response = await apiClient.sendMessageStream(
@@ -150,11 +217,19 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
             stream: true,
           },
           (chunk: string) => {
+            if (!hasReceivedContent && chunk.trim()) {
+              // First content received - stop loading indicators
+              hasReceivedContent = true;
+              stopLoadingStatus();
+            }
             fullContent += chunk;
             // Update the last assistant message as chunks arrive
             updateLastAssistantMessage(() => fullContent);
           }
         );
+
+        // Ensure loading status is stopped
+        stopLoadingStatus();
 
         // If this is a new conversation, create it
         if (!currentConversationId && response.conversation_id) {
@@ -174,6 +249,10 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
           })),
         });
       } else {
+        // Non-streaming response - create placeholder message for loading indicator
+        const placeholderMsg: ChatMessage = { role: 'assistant', content: '', mode: responseMode };
+        addMessage(placeholderMsg);
+
         // Non-streaming response
         const response: ChatResponse = await apiClient.sendMessage(courseId, {
           message: userMessage,
@@ -183,6 +262,9 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
           stream: false,
         });
 
+        // Stop loading indicators when response arrives
+        stopLoadingStatus();
+
         // If this is a new conversation, create it
         if (!currentConversationId && response.conversation_id) {
           const title = userMessage.length > 50 ? userMessage.substring(0, 50) : userMessage;
@@ -190,16 +272,20 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
           await refreshConversations();
         }
 
-        const assistantMsg: ChatMessage = {
-          role: 'assistant',
+        // Update placeholder message with actual response (mode is already set on placeholder)
+        updateLastAssistantMessageComplete({
           content: response.content,
-          sources: response.sources,
-          mode: response.mode || responseMode,
-        };
-        addMessage(assistantMsg);
+          sources: response.sources?.map((src) => ({
+            document_id: src.document_id,
+            document_name: src.document_name,
+            page: src.page,
+            chunk_text: src.chunk_text || '',
+          })),
+        });
       }
     } catch (err) {
       console.error('Failed to send message:', err);
+      stopLoadingStatus();
       // Remove user message on error - handled by hook
     } finally {
       setSending(false);
@@ -323,83 +409,131 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
             </p>
           </div>
         ) : (
-          messages.map((msg, idx) => {
-            const hasCourseMaterialHeader = msg.content.includes('Based on Course Material:');
-            const hasAdditionalContextHeader = msg.content.includes('Additional Context:');
-            const isHybrid = msg.mode === 'hybrid' && (hasCourseMaterialHeader || hasAdditionalContextHeader);
-            let courseMaterialSection = '';
-            let additionalContextSection = '';
-            
-            if (isHybrid) {
-              if (hasAdditionalContextHeader) {
-                const parts = msg.content.split('Additional Context:');
-                const coursePart = parts[0];
-                courseMaterialSection = coursePart.replace('Based on Course Material:', '').trim();
-                additionalContextSection = parts[1]?.trim() || '';
-              } else if (hasCourseMaterialHeader) {
-                courseMaterialSection = msg.content.replace('Based on Course Material:', '').trim();
+          <>
+            {messages.map((msg, idx) => {
+              // Improved parsing for hybrid messages
+              const hasCourseMaterialHeader = msg.content.includes('Based on Course Material:');
+              const hasAdditionalContextHeader = msg.content.includes('Additional Context:');
+              const isHybrid = msg.mode === 'hybrid' && (hasCourseMaterialHeader || hasAdditionalContextHeader);
+              let courseMaterialSection = '';
+              let additionalContextSection = '';
+              
+              if (isHybrid && msg.content) {
+                // Parse both sections properly
+                const courseMaterialMatch = msg.content.match(/Based on Course Material:\s*(.*?)(?=Additional Context:|$)/s);
+                const additionalContextMatch = msg.content.match(/Additional Context:\s*(.*?)$/s);
+                
+                if (courseMaterialMatch) {
+                  courseMaterialSection = courseMaterialMatch[1].trim();
+                }
+                if (additionalContextMatch) {
+                  additionalContextSection = additionalContextMatch[1].trim();
+                }
               }
-            }
-            
-            return (
-              <div
-                key={idx}
-                style={{
-                  ...styles.message,
-                  ...(msg.role === 'user' ? styles.userMessage : styles.assistantMessage),
-                }}
-              >
-                {isHybrid && (courseMaterialSection || additionalContextSection) ? (
-                  <div>
-                    {courseMaterialSection && (
-                      <div style={styles.courseMaterialSection}>
-                        <strong style={styles.sectionHeader}>📚 Based on Course Material:</strong>
-                        <MarkdownMessage content={courseMaterialSection} isUser={false} />
-                      </div>
-                    )}
-                    {additionalContextSection && (
-                      <div style={styles.additionalContextSection}>
-                        <strong style={styles.sectionHeader}>🌐 Additional Context:</strong>
-                        <MarkdownMessage content={additionalContextSection} isUser={false} />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <MarkdownMessage content={msg.content} isUser={msg.role === 'user'} />
-                )}
-                {msg.sources && msg.sources.length > 0 && (
-                  <div style={{
-                    ...styles.sources,
-                    ...(msg.role === 'assistant' ? styles.sourcesAssistant : {}),
-                  }}>
-                    <strong style={msg.role === 'assistant' ? { color: '#374151' } : { color: 'white' }}>Sources:</strong>
-                    <div>
-                      {msg.sources.map((src, srcIdx) => (
-                        <span
-                          key={srcIdx}
-                          onClick={() => onSourceClick && src.chunk_text && onSourceClick({
-                            document_id: src.document_id,
-                            document_name: src.document_name,
-                            page: src.page,
-                            chunk_text: src.chunk_text,
-                          })}
-                          style={{
-                            ...styles.sourceTag,
-                            ...(msg.role === 'assistant' ? styles.sourceTagAssistant : {}),
-                            cursor: onSourceClick && src.chunk_text ? 'pointer' : 'default',
-                            textDecoration: onSourceClick && src.chunk_text ? 'underline' : 'none',
-                          }}
-                          title={onSourceClick && src.chunk_text ? `Click to view ${src.document_name || 'document'} on page ${src.page}` : `${src.document_name || 'Unknown Document'} - Page ${src.page}`}
-                        >
-                          {src.document_name || 'Unknown Document'} - Page {src.page}
-                        </span>
-                      ))}
+              
+              // Check if this is the last message and still loading
+              const isLastMessage = idx === messages.length - 1;
+              const isCurrentlyLoading = isLastMessage && msg.role === 'assistant' && loadingStatus && !msg.content.trim();
+              
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    ...styles.message,
+                    ...(msg.role === 'user' ? styles.userMessage : styles.assistantMessage),
+                  }}
+                >
+                  {isCurrentlyLoading ? (
+                    // Show loading indicator
+                    <div style={styles.loadingIndicator}>
+                      <div style={styles.loadingSpinner}></div>
+                      <span style={styles.loadingText}>{loadingStatus}</span>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
+                  ) : isHybrid && (courseMaterialSection || additionalContextSection) ? (
+                    <div>
+                      {courseMaterialSection && (
+                        <div style={styles.courseMaterialSection}>
+                          <div style={styles.sectionHeader}>Based on Course Material:</div>
+                          <MarkdownMessage content={courseMaterialSection} isUser={false} />
+                        </div>
+                      )}
+                      {additionalContextSection && (
+                        <div style={styles.additionalContextSection}>
+                          <div style={styles.sectionHeader}>Additional Context:</div>
+                          <MarkdownMessage content={additionalContextSection} isUser={false} />
+                        </div>
+                      )}
+                      {/* Sources at the bottom of the entire response */}
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div style={{
+                          ...styles.sources,
+                          ...styles.sourcesAssistant,
+                        }}>
+                          <strong style={{ color: '#374151', fontSize: '0.75rem', display: 'block', marginTop: '0.5rem', marginBottom: '0.25rem' }}>Sources:</strong>
+                          <div>
+                            {msg.sources.map((src, srcIdx) => (
+                              <span
+                                key={srcIdx}
+                                onClick={() => onSourceClick && src.chunk_text && onSourceClick({
+                                  document_id: src.document_id,
+                                  document_name: src.document_name,
+                                  page: src.page,
+                                  chunk_text: src.chunk_text,
+                                })}
+                                style={{
+                                  ...styles.sourceTag,
+                                  ...styles.sourceTagAssistant,
+                                  cursor: onSourceClick && src.chunk_text ? 'pointer' : 'default',
+                                  textDecoration: onSourceClick && src.chunk_text ? 'underline' : 'none',
+                                }}
+                                title={onSourceClick && src.chunk_text ? `Click to view ${src.document_name || 'document'} on page ${src.page}` : `${src.document_name || 'Unknown Document'} - Page ${src.page}`}
+                              >
+                                {src.document_name || 'Unknown Document'} - Page {src.page}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <MarkdownMessage content={msg.content} isUser={msg.role === 'user'} />
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div style={{
+                          ...styles.sources,
+                          ...(msg.role === 'assistant' ? styles.sourcesAssistant : {}),
+                        }}>
+                          <strong style={msg.role === 'assistant' ? { color: '#374151' } : { color: 'white' }}>Sources:</strong>
+                          <div>
+                            {msg.sources.map((src, srcIdx) => (
+                              <span
+                                key={srcIdx}
+                                onClick={() => onSourceClick && src.chunk_text && onSourceClick({
+                                  document_id: src.document_id,
+                                  document_name: src.document_name,
+                                  page: src.page,
+                                  chunk_text: src.chunk_text,
+                                })}
+                                style={{
+                                  ...styles.sourceTag,
+                                  ...(msg.role === 'assistant' ? styles.sourceTagAssistant : {}),
+                                  cursor: onSourceClick && src.chunk_text ? 'pointer' : 'default',
+                                  textDecoration: onSourceClick && src.chunk_text ? 'underline' : 'none',
+                                }}
+                                title={onSourceClick && src.chunk_text ? `Click to view ${src.document_name || 'document'} on page ${src.page}` : `${src.document_name || 'Unknown Document'} - Page ${src.page}`}
+                              >
+                                {src.document_name || 'Unknown Document'} - Page {src.page}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </>
         )}
         <div ref={chatEndRef} />
       </div>
@@ -544,24 +678,47 @@ const styles: Record<string, CSSProperties> = {
   },
   courseMaterialSection: {
     marginBottom: '0.75rem',
-    padding: '0.5rem 0.75rem',
-    background: 'rgba(102, 126, 234, 0.05)',
+    padding: '0.75rem 1rem',
+    background: '#e3f2fd', // Light blue - more visible
     borderRadius: '0.5rem',
-    border: '1px solid rgba(102, 126, 234, 0.15)',
+    border: '1px solid #90caf9',
+    boxShadow: '0 1px 2px rgba(33, 150, 243, 0.1)',
   },
   additionalContextSection: {
     marginTop: '0.75rem',
-    padding: '0.5rem 0.75rem',
-    background: 'rgba(16, 185, 129, 0.05)',
+    padding: '0.75rem 1rem',
+    background: '#fffde7', // Light yellow - more visible
     borderRadius: '0.5rem',
-    border: '1px solid rgba(16, 185, 129, 0.15)',
+    border: '1px solid #fff59d',
+    boxShadow: '0 1px 2px rgba(255, 193, 7, 0.1)',
   },
   sectionHeader: {
     display: 'block',
     marginBottom: '0.5rem',
     fontSize: '0.875rem',
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
+    letterSpacing: '0.025em',
+  },
+  loadingIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '0.5rem 0',
+    color: '#6b7280',
+  },
+  loadingSpinner: {
+    width: '16px',
+    height: '16px',
+    border: '2px solid #e5e7eb',
+    borderTopColor: '#667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  loadingText: {
+    fontSize: '0.875rem',
+    fontStyle: 'italic',
+    color: '#6b7280',
   },
   sources: {
     marginTop: '0.375rem',
