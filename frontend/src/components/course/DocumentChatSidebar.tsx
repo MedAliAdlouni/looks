@@ -8,6 +8,8 @@ import { apiClient } from '../../api/client';
 import type { ChatResponse } from '../../types/api';
 import { MarkdownMessage } from '../shared';
 import { ChatSettingsPanel } from './ChatSettingsPanel';
+import { ConversationList } from './ConversationList';
+import { useConversations } from '../../hooks/useConversations';
 import type { CSSProperties } from 'react';
 
 export interface DocumentChatSidebarProps {
@@ -38,16 +40,40 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
   isOpen,
   onToggle,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Conversation management
+  const {
+    conversations,
+    currentConversationId,
+    messages: conversationMessages,
+    switchConversation,
+    createNewConversation,
+    addMessage,
+    updateLastAssistantMessage,
+    updateLastAssistantMessageComplete,
+    refreshConversations,
+  } = useConversations(courseId);
+
+  // Convert conversation messages to ChatMessage format
+  const messages: ChatMessage[] = conversationMessages.map((msg) => ({
+    role: msg.role,
+    content: msg.content,
+    sources: msg.sources?.map((src) => ({
+      document_id: '', // Will be populated if available from API
+      document_name: src.document_name || 'Unknown Document',
+      page: src.page,
+      chunk_text: undefined,
+    })),
+  }));
+
   const [inputMessage, setInputMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
   const [isResizing, setIsResizing] = useState(false);
   const [responseMode, setResponseMode] = useState<'strict' | 'hybrid'>('strict');
   const [verbosity, setVerbosity] = useState<'concise' | 'normal' | 'detailed'>('normal');
   const [streaming, setStreaming] = useState<boolean>(false);
   const [settingsExpanded, setSettingsExpanded] = useState<boolean>(false);
+  const [conversationListOpen, setConversationListOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -98,92 +124,120 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
 
     const userMessage = inputMessage.trim();
     setInputMessage('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    
+    // Add user message immediately
+    const userMsg: ChatMessage = { role: 'user', content: userMessage };
+    addMessage(userMsg);
+    
     setSending(true);
 
     try {
       if (streaming) {
         // Streaming response - create placeholder message
-        setMessages((prev) => [...prev, { role: 'assistant', content: '', mode: responseMode }]);
+        const placeholderMsg: ChatMessage = { role: 'assistant', content: '', mode: responseMode };
+        addMessage(placeholderMsg);
+
+        let fullContent = '';
 
         // Stream chunks and update message in real-time
         const response = await apiClient.sendMessageStream(
           courseId,
           {
             message: userMessage,
-            conversation_id: conversationId,
+            conversation_id: currentConversationId || undefined,
             mode: responseMode,
             verbosity: verbosity,
             stream: true,
           },
           (chunk: string) => {
-            // Update message content as chunks arrive
-            setMessages((prev) => {
-              const updated = [...prev];
-              const lastIndex = updated.length - 1;
-              if (updated[lastIndex]?.role === 'assistant') {
-                updated[lastIndex] = {
-                  ...updated[lastIndex],
-                  content: (updated[lastIndex].content || '') + chunk,
-                };
-              }
-              return updated;
-            });
+            fullContent += chunk;
+            // Update the last assistant message as chunks arrive
+            updateLastAssistantMessage(() => fullContent);
           }
         );
 
-        if (response.conversation_id) {
-          setConversationId(response.conversation_id);
+        // If this is a new conversation, create it
+        if (!currentConversationId && response.conversation_id) {
+          const title = userMessage.length > 50 ? userMessage.substring(0, 50) : userMessage;
+          createNewConversation(response.conversation_id, title);
+          await refreshConversations();
         }
 
-        // Final update with sources (streaming doesn't send sources until complete)
-        setMessages((prev) => {
-          const updated = [...prev];
-          const lastIndex = updated.length - 1;
-          if (updated[lastIndex]?.role === 'assistant') {
-            updated[lastIndex] = {
-              ...updated[lastIndex],
-              sources: response.sources,
-              mode: response.mode || responseMode,
-            };
-          }
-          return updated;
+        // Final update with sources (mode is already set on placeholder message)
+        updateLastAssistantMessageComplete({
+          content: fullContent,
+          sources: response.sources?.map((src) => ({
+            document_id: src.document_id,
+            document_name: src.document_name,
+            page: src.page,
+            chunk_text: src.chunk_text || '',
+          })),
         });
       } else {
         // Non-streaming response
         const response: ChatResponse = await apiClient.sendMessage(courseId, {
           message: userMessage,
-          conversation_id: conversationId,
+          conversation_id: currentConversationId || undefined,
           mode: responseMode,
           verbosity: verbosity,
           stream: false,
         });
 
-        setConversationId(response.conversation_id);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: response.content,
-            sources: response.sources,
-            mode: response.mode || responseMode,
-          },
-        ]);
+        // If this is a new conversation, create it
+        if (!currentConversationId && response.conversation_id) {
+          const title = userMessage.length > 50 ? userMessage.substring(0, 50) : userMessage;
+          createNewConversation(response.conversation_id, title);
+          await refreshConversations();
+        }
+
+        const assistantMsg: ChatMessage = {
+          role: 'assistant',
+          content: response.content,
+          sources: response.sources,
+          mode: response.mode || responseMode,
+        };
+        addMessage(assistantMsg);
       }
     } catch (err) {
       console.error('Failed to send message:', err);
-      setMessages((prev) => prev.slice(0, -1)); // Remove user message on error
+      // Remove user message on error - handled by hook
     } finally {
       setSending(false);
     }
+  };
+
+  const handleNewConversation = () => {
+    switchConversation(null);
+    setInputMessage('');
+  };
+
+  const handleSelectConversation = async (conversationId: string | null) => {
+    await switchConversation(conversationId);
+    setInputMessage('');
   };
 
   if (!isOpen) {
     return null;
   }
 
+  const sidebarWrapperStyle: CSSProperties = {
+    display: 'flex',
+    height: '100%',
+    position: 'relative',
+    flexShrink: 0,
+  };
+
   return (
-    <div ref={sidebarRef} style={{ ...styles.sidebar, width: `${sidebarWidth}px` }}>
+    <div style={sidebarWrapperStyle}>
+      <ConversationList
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewConversation}
+        isOpen={conversationListOpen}
+        onToggle={() => setConversationListOpen(!conversationListOpen)}
+      />
+      <div ref={sidebarRef} style={{ ...styles.sidebar, width: `${sidebarWidth}px` }}>
       {/* Resize Handle */}
       <div
         style={{
@@ -222,6 +276,13 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
       
       {/* Header with Settings Toggle and Hide Button */}
       <div style={styles.header}>
+        <button
+          onClick={() => setConversationListOpen(!conversationListOpen)}
+          style={{ ...styles.headerButton, flex: '0 0 auto', marginRight: '0.5rem' }}
+          title={conversationListOpen ? "Hide conversations" : "Show conversations"}
+        >
+          💬
+        </button>
         <button
           onClick={() => setSettingsExpanded(!settingsExpanded)}
           style={styles.headerButton}
@@ -302,14 +363,19 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
                       {msg.sources.map((src, srcIdx) => (
                         <span
                           key={srcIdx}
-                          onClick={() => onSourceClick && onSourceClick(src)}
+                          onClick={() => onSourceClick && src.chunk_text && onSourceClick({
+                            document_id: src.document_id,
+                            document_name: src.document_name,
+                            page: src.page,
+                            chunk_text: src.chunk_text,
+                          })}
                           style={{
                             ...styles.sourceTag,
                             ...(msg.role === 'assistant' ? styles.sourceTagAssistant : {}),
-                            cursor: onSourceClick ? 'pointer' : 'default',
-                            textDecoration: onSourceClick ? 'underline' : 'none',
+                            cursor: onSourceClick && src.chunk_text ? 'pointer' : 'default',
+                            textDecoration: onSourceClick && src.chunk_text ? 'underline' : 'none',
                           }}
-                          title={onSourceClick ? `Click to view ${src.document_name || 'document'} on page ${src.page}` : `${src.document_name || 'Unknown Document'} - Page ${src.page}`}
+                          title={onSourceClick && src.chunk_text ? `Click to view ${src.document_name || 'document'} on page ${src.page}` : `${src.document_name || 'Unknown Document'} - Page ${src.page}`}
                         >
                           {src.document_name || 'Unknown Document'} - Page {src.page}
                         </span>
@@ -345,6 +411,7 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
           {sending ? '...' : 'Send'}
         </button>
       </form>
+      </div>
     </div>
   );
 };

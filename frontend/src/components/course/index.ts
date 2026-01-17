@@ -25,3 +25,6 @@ export type { UploadDropzoneProps } from './UploadDropzone';
 export { CourseChatAssistant } from './CourseChatAssistant';
 export type { CourseChatAssistantProps } from './CourseChatAssistant';
 
+export { ConversationList } from './ConversationList';
+export type { ConversationListProps } from './ConversationList';
+

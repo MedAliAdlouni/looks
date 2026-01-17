@@ -96,6 +96,8 @@ export interface MCQ {
 export interface MCQRequest {
   topic?: string;
   num_questions?: number;
+  document_ids?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 export interface MCQListResponse {
@@ -104,11 +106,18 @@ export interface MCQListResponse {
 
 export interface OpenEndedQuestionRequest {
   topic?: string;
+  num_questions?: number;
+  document_ids?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 export interface OpenEndedQuestionResponse {
   question: string;
   source_references: SourceReference[];
+}
+
+export interface OpenEndedQuestionListResponse {
+  questions: OpenEndedQuestionResponse[];
 }
 
 export interface EvaluationDetails {
@@ -128,6 +137,88 @@ export interface OpenEndedEvaluationResponse {
   evaluation: EvaluationDetails;
   feedback: string;
   source_references: SourceReference[];
+}
+
+// Find Mistake Assessment Types
+export interface FindMistakeRequest {
+  num_questions?: number;
+  document_ids?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface FindMistakeResponse {
+  type: 'find_mistake';
+  id: string;
+  prompt: string;
+  incorrect_solution: string;
+  expected_correction: string;
+  explanation: string;
+  sources: SourceReference[];
+}
+
+export interface FindMistakeListResponse {
+  items: FindMistakeResponse[];
+}
+
+// Case-Based Assessment Types
+export interface CaseBasedRequest {
+  num_questions?: number;
+  document_ids?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface CaseBasedMCQ {
+  kind: 'mcq';
+  question: string;
+  options: string[];
+  answer_index: number;
+  hint: string;
+  sources: SourceReference[];
+}
+
+export interface CaseBasedOpenEnded {
+  kind: 'open_ended';
+  question: string;
+  expected_answer: string;
+  rubric: string[];
+  sources: SourceReference[];
+}
+
+export type CaseBasedQuestion = CaseBasedMCQ | CaseBasedOpenEnded;
+
+export interface CaseBasedResponse {
+  type: 'case_based';
+  id: string;
+  case_title: string;
+  case_description: string;
+  questions: CaseBasedQuestion[];
+  sources: SourceReference[];
+}
+
+export interface CaseBasedListResponse {
+  cases: CaseBasedResponse[];
+}
+
+// Conversation Types
+export interface Conversation {
+  id: string;
+  course_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: Array<{
+    document_id: string;
+    document_name: string;
+    page: number;
+    chunk_text?: string;
+  }>;
+  created_at: string;
 }
 
 

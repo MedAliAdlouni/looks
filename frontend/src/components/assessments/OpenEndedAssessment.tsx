@@ -1,45 +1,148 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiClient } from '../../api/client';
 import type { OpenEndedQuestionResponse, OpenEndedEvaluationResponse } from '../../types/api';
+import { AssessmentGenerationConfig, type AssessmentGenerationConfigData } from './AssessmentGenerationConfig';
+import { AssessmentDashboard } from './AssessmentDashboard';
+import {
+  saveOpenEndedState,
+  loadOpenEndedState,
+  loadQuestionSet,
+  saveQuestionSet,
+  clearAssessmentState,
+  type PersistedOpenEndedState,
+} from '../../utils/assessmentPersistence';
 
 interface OpenEndedAssessmentProps {
   courseId: string;
 }
 
 export default function OpenEndedAssessment({ courseId }: OpenEndedAssessmentProps) {
-  const [question, setQuestion] = useState<OpenEndedQuestionResponse | null>(null);
-  const [studentAnswer, setStudentAnswer] = useState('');
-  const [evaluation, setEvaluation] = useState<OpenEndedEvaluationResponse | null>(null);
+  const [showDashboard, setShowDashboard] = useState(true);
+  const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<OpenEndedQuestionResponse[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<string[]>(['']);
+  const [evaluations, setEvaluations] = useState<Array<OpenEndedEvaluationResponse | null>>([null]);
+  const [submittedQuestions, setSubmittedQuestions] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState('');
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [generationConfig, setGenerationConfig] = useState<AssessmentGenerationConfigData | null>(null);
 
-  const handleGenerate = async () => {
+  const currentQuestion = questions[currentQuestionIndex] || null;
+  const studentAnswer = answers[currentQuestionIndex] || '';
+  const evaluation = evaluations[currentQuestionIndex] || null;
+  const isSubmitted = submittedQuestions.has(currentQuestionIndex);
+
+  // Load question set when selected
+  const handleSelectSet = (setId: string) => {
+    const persisted = loadQuestionSet(courseId, 'open-ended', setId);
+    if (persisted) {
+      const state = persisted as PersistedOpenEndedState;
+      setQuestions(state.questions);
+      setCurrentQuestionIndex(state.currentIndex || 0);
+      setAnswers(state.answers || ['']);
+      setEvaluations(state.evaluations || [null]);
+      setSubmittedQuestions(state.submittedQuestions || new Set());
+      setGenerationConfig(state.generationConfig);
+      setSelectedSetId(setId);
+      setShowDashboard(false);
+    }
+  };
+
+  // Save state whenever it changes
+  useEffect(() => {
+    if (questions.length > 0 && selectedSetId) {
+      const state: PersistedOpenEndedState = {
+        questions,
+        currentIndex: currentQuestionIndex,
+        answers,
+        submittedQuestions,
+        evaluations,
+        generationConfig,
+      };
+      saveQuestionSet(courseId, 'open-ended', selectedSetId, state);
+    }
+  }, [courseId, selectedSetId, questions, currentQuestionIndex, answers, submittedQuestions, evaluations, generationConfig]);
+
+  const handleGenerateClick = () => {
+    setShowConfigPanel(true);
+  };
+
+  const handleGenerate = async (config: AssessmentGenerationConfigData) => {
     setGenerating(true);
     setError('');
     try {
-      const response = await apiClient.generateOpenEndedQuestion(courseId, {});
-      setQuestion(response);
-      setStudentAnswer('');
-      setEvaluation(null);
+      const response = await apiClient.generateOpenEndedQuestion(courseId, {
+        num_questions: config.numQuestions,
+        document_ids: config.selectedDocuments.length > 0 ? config.selectedDocuments : undefined,
+        difficulty: config.difficulty,
+        topic: undefined,
+      });
+      
+      const generatedQuestions = response.questions;
+      
+      // Create new set
+      const newSetId = saveOpenEndedState(courseId, {
+        questions: generatedQuestions,
+        currentIndex: 0,
+        answers: new Array(generatedQuestions.length).fill(''),
+        submittedQuestions: new Set(),
+        evaluations: new Array(generatedQuestions.length).fill(null),
+        generationConfig: config,
+      }, undefined);
+      
+      // Generate title from config
+      const title = `Open-Ended Assessment - ${config.numQuestions} questions${config.difficulty ? ` (${config.difficulty})` : ''}`;
+      saveQuestionSet(courseId, 'open-ended', newSetId, {
+        questions: generatedQuestions,
+        currentIndex: 0,
+        answers: new Array(generatedQuestions.length).fill(''),
+        submittedQuestions: new Set(),
+        evaluations: new Array(generatedQuestions.length).fill(null),
+        generationConfig: config,
+      }, title);
+      
+      // Update arrays
+      setQuestions(generatedQuestions);
+      setCurrentQuestionIndex(0);
+      setAnswers(new Array(generatedQuestions.length).fill(''));
+      setEvaluations(new Array(generatedQuestions.length).fill(null));
+      setSubmittedQuestions(new Set());
+      setGenerationConfig(config);
+      setSelectedSetId(newSetId);
+      setShowDashboard(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate question');
+      setError(err instanceof Error ? err.message : 'Failed to generate questions');
     } finally {
       setGenerating(false);
     }
   };
 
+  const handleBackToDashboard = () => {
+    setShowDashboard(true);
+    setSelectedSetId(null);
+  };
+
   const handleSubmit = async () => {
-    if (!question || !studentAnswer.trim()) return;
+    if (!currentQuestion || !studentAnswer.trim()) return;
 
     setEvaluating(true);
     setError('');
     try {
       const response = await apiClient.evaluateOpenEndedAnswer(courseId, {
-        question: question.question,
+        question: currentQuestion.question,
         student_answer: studentAnswer,
       });
-      setEvaluation(response);
+      
+      // Update evaluations array
+      const newEvaluations = [...evaluations];
+      newEvaluations[currentQuestionIndex] = response;
+      setEvaluations(newEvaluations);
+      
+      // Mark as submitted
+      setSubmittedQuestions(prev => new Set(prev).add(currentQuestionIndex));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to evaluate answer');
     } finally {
@@ -47,17 +150,74 @@ export default function OpenEndedAssessment({ courseId }: OpenEndedAssessmentPro
     }
   };
 
-  const handleNewQuestion = () => {
-    handleGenerate();
+  const handleAnswerChange = (value: string) => {
+    const newAnswers = [...answers];
+    newAnswers[currentQuestionIndex] = value;
+    setAnswers(newAnswers);
   };
 
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      // Initialize answer if needed
+      if (!answers[currentQuestionIndex + 1]) {
+        const newAnswers = [...answers];
+        newAnswers[currentQuestionIndex + 1] = '';
+        setAnswers(newAnswers);
+      }
+    }
+  };
+
+  // Show dashboard first
+  if (showDashboard) {
+    return (
+      <div style={styles.container}>
+        <AssessmentGenerationConfig
+          courseId={courseId}
+          isOpen={showConfigPanel}
+          onClose={() => setShowConfigPanel(false)}
+          onConfirm={handleGenerate}
+        />
+        <AssessmentDashboard
+          courseId={courseId}
+          mode="open-ended"
+          onCreateNew={() => setShowConfigPanel(true)}
+          onSelectSet={handleSelectSet}
+        />
+      </div>
+    );
+  }
+
+  // Show questions view
   return (
     <div style={styles.container}>
+      <AssessmentGenerationConfig
+        courseId={courseId}
+        isOpen={showConfigPanel}
+        onClose={() => setShowConfigPanel(false)}
+        onConfirm={handleGenerate}
+      />
+
       <div style={styles.header}>
-        <h3 style={styles.title}>Open-Ended Questions</h3>
-        {!question ? (
+        <div style={styles.headerLeft}>
           <button
-            onClick={handleGenerate}
+            onClick={handleBackToDashboard}
+            style={styles.backButton}
+            aria-label="Back to dashboard"
+          >
+            ← Back to Dashboard
+          </button>
+          <h3 style={styles.title}>Open-Ended Questions</h3>
+        </div>
+        <div style={styles.headerActions}>
+          <button
+            onClick={() => setShowConfigPanel(true)}
             disabled={generating}
             style={{
               ...styles.generateButton,
@@ -70,33 +230,15 @@ export default function OpenEndedAssessment({ courseId }: OpenEndedAssessmentPro
                 Generating...
               </>
             ) : (
-              'Generate Question'
+              'Generate More Questions'
             )}
           </button>
-        ) : (
-          <button
-            onClick={handleNewQuestion}
-            disabled={generating}
-            style={{
-              ...styles.generateButton,
-              ...(generating ? styles.buttonDisabled : {}),
-            }}
-          >
-            {generating ? (
-              <>
-                <span style={styles.spinner}></span>
-                Generating...
-              </>
-            ) : (
-              'New Question'
-            )}
-          </button>
-        )}
+        </div>
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
 
-      {!question && !generating && (
+      {questions.length === 0 && !generating && (
         <div style={styles.empty}>
           <div style={styles.emptyIcon}>✍️</div>
           <h4 style={styles.emptyTitle}>No question yet</h4>
@@ -106,18 +248,49 @@ export default function OpenEndedAssessment({ courseId }: OpenEndedAssessmentPro
         </div>
       )}
 
-      {question && (
+      {currentQuestion && (
         <div style={styles.content}>
+          {/* Navigation controls - show when multiple questions */}
+          {questions.length > 1 && (
+            <div style={styles.navigation}>
+              <button
+                onClick={handlePrevious}
+                disabled={currentQuestionIndex === 0}
+                style={{
+                  ...styles.navButton,
+                  ...(currentQuestionIndex === 0 ? styles.buttonDisabled : {}),
+                }}
+              >
+                ← Previous
+              </button>
+              <span style={styles.progressIndicator}>
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </span>
+              <button
+                onClick={handleNext}
+                disabled={currentQuestionIndex >= questions.length - 1}
+                style={{
+                  ...styles.navButton,
+                  ...(currentQuestionIndex >= questions.length - 1 ? styles.buttonDisabled : {}),
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+
           <div style={styles.questionCard}>
             <div style={styles.questionHeader}>
-              <span style={styles.questionLabel}>Question</span>
+              <span style={styles.questionLabel}>
+                {questions.length > 1 ? `Question ${currentQuestionIndex + 1} of ${questions.length}` : 'Question'}
+              </span>
             </div>
-            <div style={styles.questionText}>{question.question}</div>
-            {question.source_references.length > 0 && (
+            <div style={styles.questionText}>{currentQuestion.question}</div>
+            {currentQuestion.source_references.length > 0 && (
               <div style={styles.sources}>
                 <strong style={styles.sourcesTitle}>📚 Source References:</strong>
                 <div style={styles.sourcesList}>
-                  {question.source_references.map((ref, idx) => (
+                  {currentQuestion.source_references.map((ref, idx) => (
                     <span key={idx} style={styles.sourceTag}>
                       {ref.document_name} - Page {ref.page}
                     </span>
@@ -133,9 +306,9 @@ export default function OpenEndedAssessment({ courseId }: OpenEndedAssessmentPro
             </div>
             <textarea
               value={studentAnswer}
-              onChange={(e) => setStudentAnswer(e.target.value)}
+              onChange={(e) => handleAnswerChange(e.target.value)}
               placeholder="Type your answer here..."
-              disabled={!!evaluation}
+              disabled={isSubmitted}
               style={styles.textarea}
               rows={8}
             />
@@ -241,6 +414,53 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '0.5rem',
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '1rem',
+  },
+  backButton: {
+    padding: '0.625rem 1rem',
+    background: 'rgba(107, 114, 128, 0.1)',
+    color: '#374151',
+    border: '1px solid rgba(107, 114, 128, 0.2)',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+  },
+  headerActions: {
+    display: 'flex',
+    gap: '0.75rem',
+    alignItems: 'center',
+  },
+  navigation: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '1.5rem',
+    padding: '1rem',
+    background: 'rgba(102, 126, 234, 0.05)',
+    borderRadius: '0.75rem',
+    border: '1px solid rgba(102, 126, 234, 0.2)',
+  },
+  navButton: {
+    padding: '0.625rem 1.25rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.5rem',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    transition: 'all 0.2s',
+  },
+  progressIndicator: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    color: '#6b7280',
   },
   title: {
     margin: 0,

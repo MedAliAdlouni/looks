@@ -12,8 +12,15 @@ import type {
   MCQListResponse,
   OpenEndedQuestionRequest,
   OpenEndedQuestionResponse,
+  OpenEndedQuestionListResponse,
   OpenEndedEvaluationRequest,
   OpenEndedEvaluationResponse,
+  FindMistakeRequest,
+  FindMistakeListResponse,
+  CaseBasedRequest,
+  CaseBasedListResponse,
+  Conversation,
+  Message,
 } from '../types/api';
 
 const API_BASE = '/api';
@@ -272,8 +279,8 @@ class ApiClient {
     });
   }
 
-  async generateOpenEndedQuestion(courseId: string, request: OpenEndedQuestionRequest): Promise<OpenEndedQuestionResponse> {
-    return this.request<OpenEndedQuestionResponse>(`/courses/${courseId}/assessments/open-ended/generate`, {
+  async generateOpenEndedQuestion(courseId: string, request: OpenEndedQuestionRequest): Promise<OpenEndedQuestionListResponse> {
+    return this.request<OpenEndedQuestionListResponse>(`/courses/${courseId}/assessments/open-ended/generate`, {
       method: 'POST',
       body: JSON.stringify(request),
     });
@@ -284,6 +291,29 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  async generateFindMistake(courseId: string, request: FindMistakeRequest): Promise<FindMistakeListResponse> {
+    return this.request<FindMistakeListResponse>(`/courses/${courseId}/assessments/find-mistake/generate`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async generateCaseBased(courseId: string, request: CaseBasedRequest): Promise<CaseBasedListResponse> {
+    return this.request<CaseBasedListResponse>(`/courses/${courseId}/assessments/case-based/generate`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  // Conversations
+  async getConversations(courseId: string): Promise<Conversation[]> {
+    return this.request<Conversation[]>(`/courses/${courseId}/conversations`);
+  }
+
+  async getConversationMessages(conversationId: string): Promise<Message[]> {
+    return this.request<Message[]>(`/conversations/${conversationId}/messages`);
   }
 }
 

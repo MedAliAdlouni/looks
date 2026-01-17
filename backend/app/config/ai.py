@@ -7,7 +7,7 @@ class AIConfig(BaseSettings):
     """AI model configurations."""
 
     # LLM Models
-    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
 
     # API Keys (from environment)

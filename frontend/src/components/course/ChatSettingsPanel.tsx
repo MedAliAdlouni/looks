@@ -105,7 +105,7 @@ export const ChatSettingsPanel: React.FC<ChatSettingsPanelProps> = ({
             </span>
           </label>
           <p style={styles.streamingHint}>
-            Enable to see responses appear in real-time (ChatGPT-style)
+            Enable to see responses appear in real-time
           </p>
         </div>
       )}

@@ -4,24 +4,25 @@
  * Layout:
  * - Top Action Bar (with Assessment button)
  * - Left Sidebar (Documents list)
- * - Main Content Area (UploadDropzone + Chat when no doc, DocumentViewer when doc selected)
+ * - Main Content Area (UploadDropzone when no doc, DocumentViewer when doc selected)
  * - Right Sidebar (Chat when document selected)
  */
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import type { Course, Document, ChatResponse } from '../types/api';
-import { MCQAssessment, OpenEndedAssessment } from '../components/assessments';
+import type { Course, Document } from '../types/api';
+import { AssessmentsTab } from '../components/course/AssessmentsTab';
+import type { AssessmentType } from '../components/course/AssessmentsTab';
 import { DocumentSidebar } from '../components/course/DocumentSidebar';
 import { TopActionBar } from '../components/course/TopActionBar';
-import { UploadDropzone } from '../components/course/UploadDropzone';
-import { CourseChatAssistant } from '../components/course/CourseChatAssistant';
+import { ImportDocumentLanding } from '../components/course/ImportDocumentLanding';
 import { EmbeddedCourseDocumentView } from '../components/course/EmbeddedCourseDocumentView';
-import { LoadingSpinner, Alert, Card, Tabs } from '../components/ui';
+import { ConversationList } from '../components/course/ConversationList';
+import { LoadingSpinner, Alert, Card } from '../components/ui';
 import { theme } from '../theme';
 import type { CSSProperties } from 'react';
-import type { ChatMessage } from '../components/course/ChatTab';
+import { useConversations } from '../hooks/useConversations';
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -36,15 +37,18 @@ export default function CourseDetail() {
   // Document selection state
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
 
-  // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  // Conversation management
+  const {
+    conversations,
+    currentConversationId,
+    switchConversation,
+  } = useConversations(courseId);
+
+  const [conversationListOpen, setConversationListOpen] = useState(false);
 
   // Assessment tab state (for when user clicks Assessment button)
   const [showAssessments, setShowAssessments] = useState(false);
-  const [assessmentSubTab, setAssessmentSubTab] = useState<'mcq' | 'open-ended'>('mcq');
+  const [assessmentSubTab, setAssessmentSubTab] = useState<AssessmentType>('mcq');
 
   useEffect(() => {
     if (courseId) {
@@ -139,37 +143,12 @@ export default function CourseDetail() {
     setSelectedDocument(null);
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputMessage.trim() || !courseId || sending) return;
+  const handleNewConversation = () => {
+    switchConversation(null);
+  };
 
-    const userMessage = inputMessage.trim();
-    setInputMessage('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
-    setSending(true);
-    setError('');
-
-    try {
-      const response: ChatResponse = await apiClient.sendMessage(courseId, {
-        message: userMessage,
-        conversation_id: conversationId,
-      });
-
-      setConversationId(response.conversation_id);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: response.content,
-          sources: response.sources,
-        },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
-      setMessages((prev) => prev.slice(0, -1)); // Remove user message on error
-    } finally {
-      setSending(false);
-    }
+  const handleSelectConversation = async (conversationId: string | null) => {
+    await switchConversation(conversationId);
   };
 
   // Layout styles
@@ -235,22 +214,12 @@ export default function CourseDetail() {
           />
           <div style={mainContentStyle}>
             <Card padding="xl" style={{ height: '100%', overflow: 'auto' }}>
-              <div style={{ marginBottom: theme.spacing.lg }}>
-                <Tabs
-                  tabs={[
-                    { id: 'mcq', label: '✓ Multiple Choice' },
-                    { id: 'open-ended', label: '✍️ Open-Ended' },
-                  ]}
-                  activeTab={assessmentSubTab}
-                  onTabChange={(tabId) => setAssessmentSubTab(tabId as 'mcq' | 'open-ended')}
-                  fullWidth
-                />
-              </div>
               {courseId && (
-                <>
-                  {assessmentSubTab === 'mcq' && <MCQAssessment courseId={courseId} />}
-                  {assessmentSubTab === 'open-ended' && <OpenEndedAssessment courseId={courseId} />}
-                </>
+                <AssessmentsTab
+                  courseId={courseId}
+                  activeSubTab={assessmentSubTab}
+                  onSubTabChange={setAssessmentSubTab}
+                />
               )}
             </Card>
           </div>
@@ -262,6 +231,14 @@ export default function CourseDetail() {
   // Default view: No document selected - show upload dropzone and chat in main area
   return (
     <div style={containerStyle}>
+      <ConversationList
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        onSelectConversation={handleSelectConversation}
+        onNewConversation={handleNewConversation}
+        isOpen={conversationListOpen}
+        onToggle={() => setConversationListOpen(!conversationListOpen)}
+      />
       <TopActionBar
         courseId={courseId!}
         courseName={course.name}
@@ -326,21 +303,9 @@ export default function CourseDetail() {
               </div>
             </div>
           ) : (
-            // No document selected - show upload dropzone and chat
+            // No document selected - show import landing page
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-              <div style={{ flex: '0 0 auto', padding: theme.spacing.xs, borderBottom: `1px solid ${theme.colors.gray[200]}` }}>
-                <UploadDropzone onFileUpload={handleFileUpload} uploading={uploading} />
-              </div>
-              <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <CourseChatAssistant
-                  messages={messages}
-                  inputMessage={inputMessage}
-                  onInputChange={setInputMessage}
-                  onSend={handleSendMessage}
-                  sending={sending}
-                  placeholder="Ask questions about this course..."
-                />
-              </div>
+              <ImportDocumentLanding onFileUpload={handleFileUpload} uploading={uploading} />
             </div>
           )}
         </div>

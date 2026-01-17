@@ -170,7 +170,7 @@ async def store_vectors(
 
 
 async def query_vectors(
-    vector: List[float], course_id: str, top_k: int = 5
+    vector: List[float], course_id: str, top_k: int = 5, document_ids: List[str] = None
 ) -> List[Dict]:
     """
     Query Pinecone for similar vectors.
@@ -179,6 +179,7 @@ async def query_vectors(
         vector: Query embedding vector
         course_id: UUID of the course to filter by
         top_k: Number of results to return
+        document_ids: Optional list of document IDs to filter by (if None, returns from all documents)
 
     Returns:
         List of matches with chunk_id, similarity, page_number, and text
@@ -190,10 +191,18 @@ async def query_vectors(
         try:
             index = _get_index()
             
+            # Build filter - always filter by course_id
+            filter_dict = {"course_id": course_id}
+            
+            # If document_ids specified, add filter for document_id
+            # Pinecone uses $in operator for matching any value in a list
+            if document_ids:
+                filter_dict["document_id"] = {"$in": document_ids}
+            
             results = index.query(
                 vector=vector,
                 top_k=top_k,
-                filter={"course_id": course_id},
+                filter=filter_dict,
                 include_metadata=True,
             )
 

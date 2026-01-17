@@ -3,7 +3,7 @@ Multiple Choice Question (MCQ) Generator service.
 Generates MCQs based on course materials with structured output.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 import asyncio
 import logging
 import json
@@ -28,6 +28,8 @@ async def generate_mcq(
     course_id: str,
     topic: str = None,
     num_questions: int = 1,
+    document_ids: Optional[List[str]] = None,
+    difficulty: Optional[str] = None,
 ) -> List[Dict]:
     """
     Generate multiple-choice questions based on course materials.
@@ -36,6 +38,8 @@ async def generate_mcq(
         course_id: UUID of the course
         topic: Optional topic to focus on (if None, generates from general course material)
         num_questions: Number of MCQs to generate (default: 1)
+        document_ids: Optional list of document IDs to limit question generation to
+        difficulty: Optional difficulty level ('easy', 'medium', 'hard')
 
     Returns:
         List of MCQ dictionaries with question, options, hint, and source references
@@ -55,10 +59,14 @@ async def generate_mcq(
             vector=query_embedding,
             course_id=course_id,
             top_k=service_config.RAG_TOP_K * 2,  # Get more context for question generation
+            document_ids=document_ids,
         )
 
         if not matches:
-            raise ValueError("No course material found for this course. Please upload documents first.")
+            if document_ids:
+                raise ValueError("No course material found in the selected documents. Please ensure documents are processed and contain content.")
+            else:
+                raise ValueError("No course material found for this course. Please upload documents first.")
 
         # 3. Build context
         sources = _format_sources(matches)
@@ -67,10 +75,24 @@ async def generate_mcq(
             for s in sources
         )
 
-        # 4. Generate MCQs
+        # 4. Build difficulty instruction
+        difficulty_instruction = ""
+        if difficulty:
+            difficulty_lower = difficulty.lower()
+            if difficulty_lower == "easy":
+                difficulty_instruction = "- Difficulty: EASY - Focus on basic recall and understanding of fundamental concepts\n"
+            elif difficulty_lower == "medium":
+                difficulty_instruction = "- Difficulty: MEDIUM - Require application and analysis of concepts\n"
+            elif difficulty_lower == "hard":
+                difficulty_instruction = "- Difficulty: HARD - Require synthesis, evaluation, and critical thinking\n"
+
+        # 5. Generate MCQs
         mcqs = []
         for i in range(num_questions):
-            prompt = MCQ_GENERATION_PROMPT.format(context_str=context)
+            prompt = MCQ_GENERATION_PROMPT.format(
+                context_str=context,
+                difficulty_instruction=difficulty_instruction,
+            )
             
             # Generate answer using Gemini
             loop = asyncio.get_running_loop()
