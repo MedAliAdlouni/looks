@@ -18,11 +18,10 @@ import { DocumentSidebar } from '../components/course/DocumentSidebar';
 import { TopActionBar } from '../components/course/TopActionBar';
 import { ImportDocumentLanding } from '../components/course/ImportDocumentLanding';
 import { EmbeddedCourseDocumentView } from '../components/course/EmbeddedCourseDocumentView';
-import { ConversationList } from '../components/course/ConversationList';
+import { DocumentChatSidebar } from '../components/course/DocumentChatSidebar';
 import { LoadingSpinner, Alert, Card } from '../components/ui';
 import { theme } from '../theme';
 import type { CSSProperties } from 'react';
-import { useConversations } from '../hooks/useConversations';
 
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -37,14 +36,9 @@ export default function CourseDetail() {
   // Document selection state
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
 
-  // Conversation management
-  const {
-    conversations,
-    currentConversationId,
-    switchConversation,
-  } = useConversations(courseId);
-
-  const [conversationListOpen, setConversationListOpen] = useState(false);
+  // Chat sidebar state for when no document is selected
+  const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
+  const [chatSidebarWidth, setChatSidebarWidth] = useState(400);
 
   // Assessment tab state (for when user clicks Assessment button)
   const [showAssessments, setShowAssessments] = useState(false);
@@ -143,13 +137,19 @@ export default function CourseDetail() {
     setSelectedDocument(null);
   };
 
-  const handleNewConversation = () => {
-    switchConversation(null);
+  const handlePasteText = async (title: string, text: string) => {
+    if (!courseId) return;
+
+    try {
+      await apiClient.pasteTextDocument(courseId, title, text);
+      await loadDocuments();
+      await loadCourse(); // Refresh course to update document count
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add text document');
+      throw err; // Re-throw so modal can handle it
+    }
   };
 
-  const handleSelectConversation = async (conversationId: string | null) => {
-    await switchConversation(conversationId);
-  };
 
   // Layout styles
   const containerStyle: CSSProperties = {
@@ -231,19 +231,13 @@ export default function CourseDetail() {
   // Default view: No document selected - show upload dropzone and chat in main area
   return (
     <div style={containerStyle}>
-      <ConversationList
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-        isOpen={conversationListOpen}
-        onToggle={() => setConversationListOpen(!conversationListOpen)}
-      />
       <TopActionBar
         courseId={courseId!}
         courseName={course.name}
         onBack={() => navigate('/')}
         onAssessmentsClick={() => setShowAssessments(true)}
+        onChatClick={() => setChatSidebarOpen(true)}
+        chatSidebarOpen={chatSidebarOpen}
       />
       <div style={contentWrapperStyle}>
         <DocumentSidebar
@@ -303,9 +297,43 @@ export default function CourseDetail() {
               </div>
             </div>
           ) : (
-            // No document selected - show import landing page
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-              <ImportDocumentLanding onFileUpload={handleFileUpload} uploading={uploading} />
+            // No document selected - show import landing page with optional chat sidebar
+            <div style={{ 
+              flex: 1, 
+              display: 'flex', 
+              flexDirection: 'row',
+              overflow: 'hidden', 
+              minHeight: 0,
+              position: 'relative'
+            }}>
+              <div style={{
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                width: chatSidebarOpen 
+                  ? `calc(100% - ${chatSidebarWidth}px)` 
+                  : '100%',
+                transition: 'width 0.3s ease',
+                display: 'flex',
+                flexDirection: 'column',
+              }}>
+                <ImportDocumentLanding
+                  onFileUpload={handleFileUpload}
+                  onPasteText={handlePasteText}
+                  uploading={uploading}
+                />
+              </div>
+
+              {/* Chat Sidebar - shown when no document is selected */}
+              <DocumentChatSidebar
+                courseId={courseId!}
+                documentId={undefined} // No document selected
+                documentType="course"
+                width={chatSidebarWidth}
+                onWidthChange={setChatSidebarWidth}
+                isOpen={chatSidebarOpen}
+                onToggle={() => setChatSidebarOpen(!chatSidebarOpen)}
+              />
             </div>
           )}
         </div>

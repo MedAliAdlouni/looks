@@ -11,6 +11,7 @@ import {
   ImageViewer,
   DocxViewer,
   PptxViewer,
+  TxtViewer,
   DocumentViewer,
 } from '../viewers';
 import { DocumentChatSidebar } from './DocumentChatSidebar';
@@ -47,6 +48,8 @@ export const EmbeddedCourseDocumentView: React.FC<EmbeddedCourseDocumentViewProp
       return PptxViewer;
     } else if (document.file_type === 'pdf') {
       return PDFViewer;
+    } else if (document.file_type === 'txt') {
+      return TxtViewer;
     } else {
       return DocumentViewer;
     }
@@ -57,6 +60,7 @@ export const EmbeddedCourseDocumentView: React.FC<EmbeddedCourseDocumentViewProp
     document.file_type === 'pdf' ? 'document' :
     ['docx', 'doc'].includes(document.file_type) ? 'document' :
     ['pptx', 'ppt'].includes(document.file_type) ? 'presentation' :
+    document.file_type === 'txt' ? 'document' :
     ['png', 'jpg', 'jpeg', 'svg'].includes(document.file_type) ? 'image' :
     ['mp3', 'wav', 'mp4', 'webm'].includes(document.file_type) ? 'media' :
     'document';

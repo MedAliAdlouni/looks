@@ -20,3 +20,6 @@ export type { LoadingSpinnerProps } from './LoadingSpinner';
 export { Tabs } from './Tabs';
 export type { TabsProps, Tab } from './Tabs';
 
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
+

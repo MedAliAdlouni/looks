@@ -6,9 +6,11 @@
 import React, { useRef, useState } from 'react';
 import { theme } from '../../theme';
 import type { CSSProperties } from 'react';
+import { PasteTextModal } from './PasteTextModal';
 
 export interface ImportDocumentLandingProps {
   onFileUpload: (file: File) => void;
+  onPasteText?: (title: string, text: string) => Promise<void>;
   uploading?: boolean;
   appName?: string;
 }
@@ -20,21 +22,24 @@ interface FeatureIcon {
 }
 
 const FEATURES: FeatureIcon[] = [
-  { name: 'Flashcards', icon: '📚', color: '#e0e7ff' }, // light blue-purple
   { name: 'Quiz', icon: '❓', color: '#f3e8ff' }, // light purple
-  { name: 'Cheatsheet', icon: '📄', color: '#d1fae5' }, // light green
-  { name: 'Podcast', icon: '🎧', color: '#fed7aa' }, // light orange
+  { name: 'Open-ended', icon: '📝', color: '#e0e7ff' }, // light blue-purple
+  { name: 'Find the mistake', icon: '🔍', color: '#d1fae5' }, // light green
+  { name: 'Case-based', icon: '📦', color: '#fed7aa' }, // light orange
 ];
 
 const SUPPORTED_FORMATS = ['PDF', 'Word', 'PPT', 'TXT'];
 
 export const ImportDocumentLanding: React.FC<ImportDocumentLandingProps> = ({
   onFileUpload,
+  onPasteText,
   uploading = false,
   appName = 'Looks',
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [isPasting, setIsPasting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -93,8 +98,17 @@ export const ImportDocumentLanding: React.FC<ImportDocumentLandingProps> = ({
   };
 
   const handlePasteText = () => {
-    // TODO: Implement paste text functionality
-    console.log('Paste text clicked');
+    setIsPasteModalOpen(true);
+  };
+
+  const handlePasteSubmit = async (title: string, text: string) => {
+    if (!onPasteText) return;
+    setIsPasting(true);
+    try {
+      await onPasteText(title, text);
+    } finally {
+      setIsPasting(false);
+    }
   };
 
   // Container styles
@@ -356,6 +370,16 @@ export const ImportDocumentLanding: React.FC<ImportDocumentLandingProps> = ({
           <span>Paste text</span>
         </button>
       </div>
+
+      {/* Paste Text Modal */}
+      {onPasteText && (
+        <PasteTextModal
+          isOpen={isPasteModalOpen}
+          onClose={() => setIsPasteModalOpen(false)}
+          onSubmit={handlePasteSubmit}
+          isSubmitting={isPasting}
+        />
+      )}
     </div>
   );
 };

@@ -182,6 +182,13 @@ class ApiClient {
     return this.request<Document[]>(`/courses/${courseId}/documents`);
   }
 
+  async pasteTextDocument(courseId: string, title: string, text: string): Promise<Document> {
+    return this.request<Document>(`/courses/${courseId}/documents/paste`, {
+      method: 'POST',
+      body: JSON.stringify({ title, text }),
+    });
+  }
+
   getDocumentFileUrl(documentId: string): string {
     const url = `${API_BASE}/documents/${documentId}/file`;
     // For authenticated requests, we'll need to pass the token in the Authorization header

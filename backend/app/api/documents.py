@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -30,6 +31,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["documents"])
+
+
+class PasteTextRequest(BaseModel):
+    """Request schema for pasting text."""
+    title: str
+    text: str
+
+
+class PasteTextRequest(BaseModel):
+    """Request schema for pasting text."""
+    title: str
+    text: str
 
 
 @router.post(
@@ -250,6 +263,145 @@ async def get_documents(
         )
         for doc in documents
     ]
+
+
+@router.post(
+    "/courses/{course_id}/documents/paste",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def paste_text_document(
+    course_id: str,
+    request: PasteTextRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a text document from pasted text."""
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid course ID format"
+        )
+
+    # Validate request
+    if not request.title or not request.title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Title is required"
+        )
+    
+    if not request.text or not request.text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Text is required"
+        )
+
+    # Verify course exists and user owns it
+    result = await db.execute(select(Course).where(Course.id == course_uuid))
+    course = result.scalar_one_or_none()
+
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+
+    if course.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to add documents to this course",
+        )
+
+    # Create document record
+    document_id = uuid.uuid4()
+    filename = f"{request.title.strip()}.txt"
+    file_size = len(request.text.encode('utf-8'))
+    file_type = 'txt'
+    mime_type = 'text/plain'
+
+    document = Document(
+        id=document_id,
+        course_id=course_uuid,
+        filename=filename,
+        file_path="",  # Will be set after saving
+        file_size=file_size,
+        num_pages=0,  # Will be updated after processing
+        file_type=file_type,
+        mime_type=mime_type,
+        processing_status="pending",
+    )
+
+    db.add(document)
+    await db.commit()
+    await db.refresh(document)
+
+    # Create upload directory structure
+    upload_dir = os.path.join(
+        api_config.UPLOAD_DIR, str(current_user.id), str(course_uuid)
+    )
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Save text to file
+    file_path = os.path.join(upload_dir, f"{document_id}.txt")
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(request.text)
+
+    # Update document with file path
+    document.file_path = file_path
+    document.processing_status = "processing"
+    await db.commit()
+
+    try:
+        # Process text file for RAG (same as regular text file upload)
+        # 1. Extract text (already have it, but format as pages)
+        pages = extract_text_from_file(file_path, file_type)
+        document.num_pages = len(pages)
+        await db.commit()
+
+        # 2. Create chunks (parent-child strategy)
+        small_chunks, parent_chunks = chunk_text_parent_child(pages, str(document_id))
+        # Save both small and parent chunks to database
+        await save_chunks_to_db(small_chunks, db)
+        await save_chunks_to_db(parent_chunks, db)
+
+        # 3. Generate embeddings (use small chunks for retrieval)
+        embeddings = await create_embeddings_batch(small_chunks)
+
+        # 4. Store in Pinecone (need to get page numbers from chunks)
+        # Enhance embeddings with page numbers
+        chunk_dict = {chunk["chunk_id"]: chunk for chunk in small_chunks}
+        for emb in embeddings:
+            chunk_id = emb["chunk_id"]
+            if chunk_id in chunk_dict:
+                emb["page_number"] = chunk_dict[chunk_id]["page_number"]
+                emb["text"] = chunk_dict[chunk_id]["content"][:1000]  # First 1000 chars
+
+        await store_vectors(embeddings, str(document_id), str(course_uuid))
+
+        # 5. Update status to completed
+        document.processing_status = "completed"
+        document.processed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+    except Exception as e:
+        logger.error(f"Error processing pasted text document {document_id}: {str(e)}")
+        document.processing_status = "failed"
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process document: {str(e)}",
+        )
+
+    return DocumentResponse(
+        id=str(document.id),
+        course_id=str(document.course_id),
+        filename=str(document.filename),  # type: ignore
+        file_size=int(document.file_size),  # type: ignore
+        num_pages=int(document.num_pages),  # type: ignore
+        file_type=str(document.file_type),  # type: ignore
+        mime_type=str(document.mime_type),  # type: ignore
+        processing_status=str(document.processing_status),  # type: ignore
+        uploaded_at=document.uploaded_at,  # type: ignore
+        processed_at=document.processed_at,  # type: ignore
+    )
 
 
 @router.get("/documents/{document_id}", response_model=DocumentResponse)

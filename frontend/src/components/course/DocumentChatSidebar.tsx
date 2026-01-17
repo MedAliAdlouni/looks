@@ -14,8 +14,8 @@ import type { CSSProperties } from 'react';
 
 export interface DocumentChatSidebarProps {
   courseId: string;
-  documentId: string;
-  documentType?: string; // e.g., "document", "presentation", "image"
+  documentId?: string; // Make optional to support course-level chat
+  documentType?: string; // e.g., "document", "presentation", "image", "course"
   onSourceClick?: (source: { document_id: string; document_name: string; page: number; chunk_text: string }) => void;
   width?: number;
   onWidthChange?: (width: number) => void;
@@ -33,7 +33,7 @@ export interface ChatMessage {
 export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
   courseId,
   documentId,
-  documentType = 'document',
+  documentType = 'course', // Default to 'course' when no document
   onSourceClick,
   width: initialWidth = 400,
   onWidthChange,
@@ -305,7 +305,21 @@ export const DocumentChatSidebar: React.FC<DocumentChatSidebarProps> = ({
           <div style={styles.chatEmpty}>
             <p>Start a conversation about this {documentType}!</p>
             <p style={styles.chatHint}>
-              Ask questions about the content you're viewing.
+              {documentId 
+                ? "Ask questions about the content you're viewing."
+                : "Ask questions about the course materials."}
+              <br />
+              <span
+                style={{
+                  fontSize: '0.95em',
+                  color: '#6c757d',
+                  display: 'block',
+                  marginTop: '3em', // Increased padding before the tip
+                }}
+              >
+                Tip: Click <strong>Chat settings</strong> to adjust response type and length.
+                Click the <span role="img" aria-label="conversation emoji">💬</span> emoji to show past conversations or create a new one.
+              </span>
             </p>
           </div>
         ) : (
