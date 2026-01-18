@@ -76,8 +76,9 @@ export const DashboardHeader: React.FC<DashboardHeaderProps> = ({
     display: 'flex',
     alignItems: 'center',
     gap: theme.spacing.md,
+    marginLeft: '40px',
   };
-
+; ;
   const logoImageStyle: CSSProperties = {
     height: '40px',
     width: 'auto',

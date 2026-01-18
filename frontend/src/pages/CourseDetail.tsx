@@ -234,7 +234,7 @@ export default function CourseDetail() {
       <TopActionBar
         courseId={courseId!}
         courseName={course.name}
-        onBack={() => navigate('/')}
+        onBack={() => navigate('/dashboard')}
         onAssessmentsClick={() => setShowAssessments(true)}
         onChatClick={() => setChatSidebarOpen(true)}
         chatSidebarOpen={chatSidebarOpen}

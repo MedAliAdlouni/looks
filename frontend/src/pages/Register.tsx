@@ -26,7 +26,7 @@ export default function Register() {
 
     try {
       await register(email, password, fullName);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
@@ -113,6 +113,7 @@ export default function Register() {
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 placeholder="John Doe"
+                autoComplete="name"
               />
 
               <Input
@@ -122,6 +123,7 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
+                autoComplete="email"
               />
 
               <Input
@@ -131,6 +133,7 @@ export default function Register() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 placeholder="Create a strong password"
+                autoComplete="new-password"
               />
 
               <Button

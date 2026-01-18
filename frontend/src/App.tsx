@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import CourseDetail from './pages/CourseDetail';
 
@@ -30,10 +31,14 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
+      <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
       <Route
         path="/"
+        element={user ? <Navigate to="/dashboard" /> : <Landing />}
+      />
+      <Route
+        path="/dashboard"
         element={
           <PrivateRoute>
             <Dashboard />
