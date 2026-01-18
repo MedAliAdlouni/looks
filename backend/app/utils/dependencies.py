@@ -8,14 +8,21 @@ from app.db import get_db
 from app.models.user import User
 from app.utils.security import decode_access_token
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Get current authenticated user from JWT token."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     payload = decode_access_token(credentials.credentials)
     if not payload or not (user_id := payload.get("sub")):
         raise HTTPException(

@@ -122,6 +122,13 @@ class ApiClient {
     return this.request<Course>(`/courses/${courseId}`);
   }
 
+  async updateCourse(courseId: string, data: CourseCreate): Promise<Course> {
+    return this.request<Course>(`/courses/${courseId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteCourse(courseId: string): Promise<void> {
     return this.request<void>(`/courses/${courseId}`, {
       method: 'DELETE',

@@ -1,25 +1,51 @@
 /**
- * Dashboard Page - Refactored with modular components
+ * Premium Dashboard Page
+ * Clean, minimal design with premium feel
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '../api/client';
 import type { Course } from '../types/api';
-import { PageHeader, PageLayout } from '../components/layout';
-import { Button, LoadingSpinner, Alert, Card } from '../components/ui';
-import { CourseCard, CreateCourseForm } from '../components/dashboard';
+import { PageLayout } from '../components/layout';
+import { Alert, Modal, Button } from '../components/ui';
+import {
+  DashboardHeader,
+  CourseCard,
+  CreateCourseForm,
+  UpdateCourseModal,
+  CourseCardSkeleton,
+} from '../components/dashboard';
 import { theme } from '../theme';
 import type { CSSProperties } from 'react';
 
 export default function Dashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCourses();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredCourses(courses);
+    } else {
+      const query = searchQuery.toLowerCase();
+      setFilteredCourses(
+        courses.filter(
+          (course) =>
+            course.name.toLowerCase().includes(query) ||
+            (course.description?.toLowerCase().includes(query) ?? false)
+        )
+      );
+    }
+  }, [searchQuery, courses]);
 
   const loadCourses = async () => {
     try {
@@ -34,94 +60,100 @@ export default function Dashboard() {
   };
 
   const handleCreateCourse = async (name: string, description: string) => {
-    await apiClient.createCourse({ name, description });
-    setShowCreateForm(false);
-    await loadCourses();
-  };
-
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course?')) return;
-
     try {
-      await apiClient.deleteCourse(courseId);
+      await apiClient.createCourse({ name, description });
+      setShowCreateForm(false);
       await loadCourses();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete course');
+      setError(err instanceof Error ? err.message : 'Failed to create course');
     }
   };
 
-  const topBarStyle: CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: theme.spacing.xl,
-    gap: theme.spacing.md,
+  const handleUpdateCourse = async (name: string, description: string) => {
+    if (!editingCourse) return;
+    try {
+      await apiClient.updateCourse(editingCourse.id, { name, description });
+      setEditingCourse(null);
+      await loadCourses();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update course');
+      throw err;
+    }
   };
 
-  const sectionTitleStyle: CSSProperties = {
-    margin: `0 0 ${theme.spacing.xs} 0`,
-    fontSize: theme.typography.fontSize['2xl'],
-    fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.primary,
+  const handleDeleteCourse = async (courseId: string) => {
+    setDeletingCourseId(courseId);
   };
 
-  const sectionSubtitleStyle: CSSProperties = {
-    margin: 0,
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.fontSize.sm,
+  const confirmDelete = async () => {
+    if (!deletingCourseId) return;
+    try {
+      await apiClient.deleteCourse(deletingCourseId);
+      setDeletingCourseId(null);
+      await loadCourses();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete course');
+      setDeletingCourseId(null);
+    }
+  };
+
+  const containerStyle: CSSProperties = {
+    minHeight: '100vh',
+    background: theme.colors.background.secondary,
+  };
+
+  const mainStyle: CSSProperties = {
+    padding: theme.spacing.xl,
+    maxWidth: '1400px',
+    margin: '0 auto',
   };
 
   const emptyStyle: CSSProperties = {
     textAlign: 'center',
     padding: theme.spacing['4xl'],
+    maxWidth: '500px',
+    margin: '0 auto',
   };
 
   const emptyIconStyle: CSSProperties = {
     fontSize: '4rem',
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    opacity: 0.5,
   };
 
   const emptyTitleStyle: CSSProperties = {
     margin: `0 0 ${theme.spacing.sm} 0`,
     fontSize: theme.typography.fontSize['2xl'],
-    fontWeight: theme.typography.fontWeight.bold,
+    fontWeight: theme.typography.fontWeight.semibold,
     color: theme.colors.text.primary,
   };
 
   const emptyTextStyle: CSSProperties = {
-    margin: `0 0 ${theme.spacing.lg} 0`,
-    color: theme.colors.text.tertiary,
+    margin: `0 0 ${theme.spacing.xl} 0`,
+    color: theme.colors.text.secondary,
+    fontSize: theme.typography.fontSize.base,
   };
 
-  const coursesGridStyle: CSSProperties = {
+  // Responsive grid - using auto-fill with minmax for better responsiveness
+  const responsiveGridStyle: CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
     gap: theme.spacing.lg,
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
   };
 
   return (
-    <PageLayout>
-      <PageHeader
-        title="📚 Curriculum AI Tutor"
-        subtitle="Manage and access your learning materials"
+    <div style={containerStyle}>
+      <DashboardHeader
+        onSearchChange={setSearchQuery}
+        onCreateCourse={() => setShowCreateForm(true)}
       />
-
-      <main>
-        <div style={topBarStyle}>
-          <div>
-            <h2 style={sectionTitleStyle}>My Courses</h2>
-            <p style={sectionSubtitleStyle}>Manage and access your learning materials</p>
-          </div>
-          <Button
-            variant="secondary"
-            onClick={() => setShowCreateForm(!showCreateForm)}
-          >
-            {showCreateForm ? '✕ Cancel' : '+ Create Course'}
-          </Button>
-        </div>
-
+      <main style={mainStyle}>
         {error && (
-          <Alert variant="error" onClose={() => setError('')} style={{ marginBottom: theme.spacing.lg }}>
+          <Alert
+            variant="error"
+            onClose={() => setError('')}
+            style={{ marginBottom: theme.spacing.lg }}
+          >
             {error}
           </Alert>
         )}
@@ -134,29 +166,85 @@ export default function Dashboard() {
         )}
 
         {loading ? (
-          <LoadingSpinner text="Loading courses..." />
-        ) : courses.length === 0 ? (
-          <Card padding="xl" style={emptyStyle}>
+          <div style={responsiveGridStyle}>
+            {[...Array(6)].map((_, i) => (
+              <CourseCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredCourses.length === 0 ? (
+          <div style={emptyStyle}>
             <div style={emptyIconStyle}>📖</div>
-            <h3 style={emptyTitleStyle}>No courses yet</h3>
-            <p style={emptyTextStyle}>Create your first course to get started!</p>
-            <Button variant="primary" onClick={() => setShowCreateForm(true)}>
-              Create Your First Course
-            </Button>
-          </Card>
+            <h2 style={emptyTitleStyle}>
+              {searchQuery ? 'No courses found' : 'No courses yet'}
+            </h2>
+            <p style={emptyTextStyle}>
+              {searchQuery
+                ? 'Try adjusting your search terms'
+                : 'Create your first course to get started!'}
+            </p>
+            {!searchQuery && (
+              <Button variant="primary" onClick={() => setShowCreateForm(true)}>
+                New course
+              </Button>
+            )}
+          </div>
         ) : (
-          <div style={coursesGridStyle}>
-            {courses.map((course, index) => (
+          <div style={responsiveGridStyle}>
+            {filteredCourses.map((course) => (
               <CourseCard
                 key={course.id}
                 course={course}
+                onEdit={setEditingCourse}
                 onDelete={handleDeleteCourse}
-                index={index}
               />
             ))}
           </div>
         )}
       </main>
-    </PageLayout>
+
+      {editingCourse && (
+        <UpdateCourseModal
+          isOpen={!!editingCourse}
+          onClose={() => setEditingCourse(null)}
+          course={editingCourse}
+          onUpdate={handleUpdateCourse}
+        />
+      )}
+
+      <Modal
+        isOpen={!!deletingCourseId}
+        onClose={() => setDeletingCourseId(null)}
+        title="Delete Course"
+        maxWidth="400px"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
+          <p style={{ color: theme.colors.text.secondary, margin: 0 }}>
+            Are you sure you want to delete this course? This action cannot be undone and will
+            delete all associated documents and conversations.
+          </p>
+          <div
+            style={{
+              display: 'flex',
+              gap: theme.spacing.md,
+              justifyContent: 'flex-end',
+            }}
+          >
+            <Button variant="ghost" onClick={() => setDeletingCourseId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="error"
+              onClick={confirmDelete}
+              style={{
+                background: theme.colors.error.DEFAULT,
+                color: theme.colors.text.inverse,
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

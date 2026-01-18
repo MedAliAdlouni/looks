@@ -9,7 +9,7 @@ from app.db import get_db
 from app.models.user import User
 from app.models.course import Course
 from app.models.document import Document
-from app.schemas.course import CourseCreate, CourseResponse
+from app.schemas.course import CourseCreate, CourseResponse, CourseUpdate
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
@@ -99,6 +99,58 @@ async def get_course(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this course",
         )
+
+    # Count documents
+    doc_count_result = await db.execute(
+        select(func.count(Document.id)).where(Document.course_id == course_uuid)
+    )
+    document_count = doc_count_result.scalar() or 0
+
+    return CourseResponse(
+        id=str(course.id),
+        user_id=str(course.user_id),
+        name=course.name,
+        description=course.description,
+        document_count=document_count,
+        created_at=course.created_at,
+        updated_at=course.updated_at,
+    )
+
+
+@router.put("/{course_id}", response_model=CourseResponse)
+async def update_course(
+    course_id: str,
+    course_data: CourseUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a course."""
+    try:
+        course_uuid = uuid.UUID(course_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid course ID format"
+        )
+
+    result = await db.execute(select(Course).where(Course.id == course_uuid))
+    course = result.scalar_one_or_none()
+
+    if course is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+        )
+
+    if course.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this course",
+        )
+
+    course.name = course_data.name
+    course.description = course_data.description
+
+    await db.commit()
+    await db.refresh(course)
 
     # Count documents
     doc_count_result = await db.execute(

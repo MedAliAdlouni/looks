@@ -18,6 +18,12 @@ class CourseCreate(CourseBase):
     pass
 
 
+class CourseUpdate(CourseBase):
+    """Course update schema."""
+
+    pass
+
+
 class CourseResponse(CourseBase):
     """Course response schema."""
 

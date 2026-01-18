@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Dashboard Preview</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+:root{
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --text: #0f172a;
+  --muted: #64748b;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadowHover: 0 10px 20px rgba(15, 23, 42, 0.10);
+  --radius: 16px;
+  --primary: #3b82f6;
+  --primaryHover: #2563eb;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+
+.page { min-height: 100vh; }
+
+.topbar{
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(247,247,248,0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbarInner{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 420px) 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand{ display:flex; gap:12px; align-items:center; min-width: 0; }
+.brandMark{
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  display:flex; align-items:center; justify-content:center;
+  background: #fff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+}
+.brandText{ min-width: 0; }
+.brandTitle{ font-weight: 700; font-size: 14px; line-height: 1.2; }
+.brandSub{ font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+.searchWrap{ display:flex; justify-content:center; }
+.search{
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.85);
+  border-radius: 14px;
+  padding: 10px 12px;
+  outline: none;
+  box-shadow: var(--shadow);
+}
+.search:focus{ border-color: rgba(59,130,246,0.6); box-shadow: 0 0 0 4px rgba(59,130,246,0.12); }
+
+.topbarRight{ display:flex; justify-content:flex-end; gap: 10px; align-items:center; }
+
+.btn{
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:hover{ box-shadow: var(--shadow); }
+.btnPrimary{
+  border-color: rgba(59,130,246,0.35);
+  background: var(--primary);
+  color: #fff;
+}
+.btnPrimary:hover{ background: var(--primaryHover); }
+.btnGhost{
+  background: transparent;
+}
+.btnGhost:hover{ background: rgba(15,23,42,0.04); }
+
+.avatarBtn{
+  display:flex; align-items:center; gap: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.85);
+  padding: 8px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.avatar{
+  width: 28px; height: 28px;
+  border-radius: 999px;
+  display:flex; align-items:center; justify-content:center;
+  background: #0f172a;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+}
+.avatarName{ color: var(--muted); font-weight: 600; font-size: 13px; }
+
+.container{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 26px 20px 48px;
+}
+
+.sectionHeader{
+  display:flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 18px;
+}
+.h1{ margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.muted{ margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+  min-height: 170px;
+  outline: none;
+}
+.card:hover, .card:focus{
+  box-shadow: var(--shadowHover);
+  transform: translateY(-2px);
+  border-color: rgba(15,23,42,0.18);
+}
+
+.cardTop{
+  display:flex;
+  align-items:flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardTitleWrap{
+  display:flex;
+  gap: 10px;
+  align-items:flex-start;
+  min-width: 0;
+}
+
+.courseIcon{
+  width: 34px; height: 34px;
+  border-radius: 12px;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(59,130,246,0.10);
+  border: 1px solid rgba(59,130,246,0.20);
+  flex: 0 0 auto;
+}
+
+.cardTitle{
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.iconBtn{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.7);
+  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}
+.iconBtn:hover{ background: rgba(15,23,42,0.03); }
+.kebab{ display:block; transform: translateY(-1px); font-size: 16px; color: #334155; }
+
+.cardDesc{
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 40px;
+}
+
+.metaRow{
+  margin-top: 12px;
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.metaText{
+  color: var(--muted);
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.badge{
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.03);
+  color: #334155;
+  font-weight: 600;
+}
+.badgeNeutral{ background: rgba(15,23,42,0.03); }
+.badgeGreen{ background: rgba(16,185,129,0.10); border-color: rgba(16,185,129,0.25); color: #065f46; }
+.badgeAmber{ background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.25); color: #92400e; }
+.badgeRed{ background: rgba(239,68,68,0.10); border-color: rgba(239,68,68,0.25); color: #991b1b; }
+
+.cardActions{
+  margin-top: 14px;
+  display:flex;
+  gap: 10px;
+}
+
+.empty{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 40px 0;
+}
+.emptyCard{
+  width: min(520px, 100%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  text-align:center;
+}
+.emptyIcon{ font-size: 22px; }
+.emptyTitle{ margin-top: 10px; font-size: 16px; font-weight: 800; }
+.emptyText{ margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.emptyActions{ margin-top: 14px; display:flex; gap: 10px; justify-content:center; flex-wrap: wrap; }
+
+@media (max-width: 980px){
+  .topbarInner{ grid-template-columns: 1fr; }
+  .searchWrap{ order: 3; }
+  .topbarRight{ justify-content: flex-start; }
+  .grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px){
+  .grid{ grid-template-columns: 1fr; }
+}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    type Course = {
+      id: string;
+      title: string;
+      description?: string;
+      documentsCount: number;
+      status: "Indexed" | "Processing" | "Failed";
+      lastActivity?: string; // e.g. "2 days ago"
+    };
+
+    const MOCK_COURSES: Course[] = [
+      {
+        id: "1",
+        title: "Mathematics",
+        description: "Linear algebra course",
+        documentsCount: 0,
+        status: "Indexed",
+        lastActivity: "Today",
+      },
+      {
+        id: "2",
+        title: "General Audio Foundation Models",
+        description:
+          "Intro to audio foundation models and applications across speech, music, and environment.",
+        documentsCount: 8,
+        status: "Indexed",
+        lastActivity: "2 days ago",
+      },
+      {
+        id: "3",
+        title: "History",
+        description: "WWI and WWII history",
+        documentsCount: 0,
+        status: "Processing",
+        lastActivity: "Yesterday",
+      },
+      {
+        id: "4",
+        title: "Machine Learning",
+        description:
+          "Fundamental concepts and methods of machine learning with hands-on practice.",
+        documentsCount: 12,
+        status: "Failed",
+        lastActivity: "1 week ago",
+      },
+    ];
+
+    function cx(...classes) {
+      return classes.filter(Boolean).join(" ");
+    }
+
+    function StatusBadge({ status }) {
+      const cls =
+        status === "Indexed"
+          ? "badge badgeGreen"
+          : status === "Processing"
+            ? "badge badgeAmber"
+            : "badge badgeRed";
+      return <span className={cls}>{status}</span>;
+    }
+
+    function DocBadge({ count }) {
+      return <span className="badge badgeNeutral">{count} docs</span>;
+    }
+
+    function IconCourse() {
+      return (
+        <span className="courseIcon" aria-hidden="true">
+          📚
+        </span>
+      );
+    }
+
+    function KebabButton() {
+      return (
+        <button className="iconBtn" aria-label="Open actions menu" type="button">
+          <span className="kebab">⋮</span>
+        </button>
+      );
+    }
+
+    function Button({
+      variant,
+      children,
+    }) {
+      return (
+        <button className={cx("btn", variant === "primary" ? "btnPrimary" : "btnGhost")} type="button">
+          {children}
+        </button>
+      );
+    }
+
+    function PremiumCoursesDashboardMock() {
+      const [query, setQuery] = useState("");
+
+      const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        if (!q) return MOCK_COURSES;
+        return MOCK_COURSES.filter(
+          (c) =>
+            c.title.toLowerCase().includes(q) ||
+            (c.description ?? "").toLowerCase().includes(q)
+        );
+      }, [query]);
+
+      return (
+        <div className="page">
+          <header className="topbar">
+            <div className="topbarInner">
+              <div className="brand">
+                <div className="brandMark" aria-hidden="true">▦</div>
+                <div className="brandText">
+                  <div className="brandTitle">Curriculum AI Tutor</div>
+                  <div className="brandSub">Courses</div>
+                </div>
+              </div>
+
+              <div className="searchWrap">
+                <input
+                  className="search"
+                  placeholder="Search courses…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="Search courses"
+                />
+              </div>
+
+              <div className="topbarRight">
+                <button className="btn btnPrimary" type="button">
+                  New course
+                </button>
+                <button className="avatarBtn" type="button" aria-label="Open profile menu">
+                  <span className="avatar">M</span>
+                  <span className="avatarName">meladlouni</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="container">
+            <div className="sectionHeader">
+              <div>
+                <h1 className="h1">My courses</h1>
+                <p className="muted">Manage and access your learning materials.</p>
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="empty">
+                <div className="emptyCard">
+                  <div className="emptyIcon" aria-hidden="true">✨</div>
+                  <div className="emptyTitle">No courses found</div>
+                  <div className="emptyText">
+                    Try a different search, or create a new course to get started.
+                  </div>
+                  <div className="emptyActions">
+                    <button className="btn btnPrimary" type="button">New course</button>
+                    <button className="btn btnGhost" type="button" onClick={() => setQuery("")}>
+                      Clear search
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid">
+                {filtered.map((course) => (
+                  <article className="card" key={course.id} tabIndex={0}>
+                    <div className="cardTop">
+                      <div className="cardTitleWrap">
+                        <IconCourse />
+                        <h2 className="cardTitle" title={course.title}>
+                          {course.title}
+                        </h2>
+                      </div>
+                      <KebabButton />
+                    </div>
+
+                    <p className="cardDesc" title={course.description}>
+                      {course.description || "—"}
+                    </p>
+
+                    <div className="metaRow">
+                      <DocBadge count={course.documentsCount} />
+                      <StatusBadge status={course.status} />
+                      {course.lastActivity ? (
+                        <span className="metaText">{course.lastActivity}</span>
+                      ) : null}
+                    </div>
+
+                    <div className="cardActions">
+                      <Button variant="primary">Open</Button>
+                      <Button variant="ghost">Assess</Button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<PremiumCoursesDashboardMock />);
+  </script>
+</body>
+</html>
