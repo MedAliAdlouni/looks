@@ -30,19 +30,18 @@ export const Tabs: React.FC<TabsProps> = ({
 }) => {
   const containerStyle: CSSProperties = {
     display: 'flex',
-    gap: theme.spacing.md,
-    background: theme.colors.background.overlay,
-    backdropFilter: 'blur(10px)',
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.xl,
-    boxShadow: theme.shadows.md,
+    gap: theme.spacing.sm,
+    background: theme.colors.background.secondary,
+    padding: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    border: `1px solid ${theme.colors.gray[200]}`,
   };
 
   const tabBaseStyle: CSSProperties = {
     padding: `${theme.spacing.sm} ${theme.spacing.lg}`,
     background: 'transparent',
     border: 'none',
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: theme.borderRadius.sm,
     cursor: 'pointer',
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.text.tertiary,
@@ -56,10 +55,10 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const activeTabStyle: CSSProperties = {
-    background: theme.gradients.primary,
-    color: theme.colors.text.inverse,
+    background: theme.colors.background.primary,
+    color: theme.colors.text.primary,
     fontWeight: theme.typography.fontWeight.semibold,
-    boxShadow: theme.shadows.primary,
+    boxShadow: theme.shadows.sm,
   };
 
   return (

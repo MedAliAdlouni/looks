@@ -52,29 +52,28 @@ export const glassEffect = (opacity: number = 0.95): CSSProperties => ({
 });
 
 /**
- * Create a card style
+ * Create a card style - minimal, elegant
  */
 export const cardStyle = (): CSSProperties => ({
-  background: theme.colors.background.overlay,
-  backdropFilter: 'blur(10px)',
-  borderRadius: getRadius('xl'),
-  boxShadow: getShadow('xl'),
-  border: '1px solid rgba(255, 255, 255, 0.2)',
+  background: theme.colors.background.primary,
+  borderRadius: getRadius('lg'),
+  boxShadow: getShadow('sm'),
+  border: `1px solid ${theme.colors.gray[200]}`,
 });
 
 /**
- * Create a button style variant
+ * Create a button style variant - minimal, elegant
  */
 export const buttonVariant = (
   variant: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'ghost'
 ): CSSProperties => {
   const base: CSSProperties = {
     padding: `${getSpacing('sm')} ${getSpacing('lg')}`,
-    borderRadius: getRadius('lg'),
+    borderRadius: getRadius('md'),
     fontSize: theme.typography.fontSize.base,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontWeight: theme.typography.fontWeight.medium,
     cursor: 'pointer',
-    border: 'none',
+    border: '1px solid transparent',
     transition: `all ${theme.transitions.default}`,
     display: 'inline-flex',
     alignItems: 'center',
@@ -86,36 +85,41 @@ export const buttonVariant = (
     case 'primary':
       return {
         ...base,
-        background: theme.gradients.primary,
+        background: theme.colors.primary.DEFAULT,
         color: theme.colors.text.inverse,
-        boxShadow: getShadow('primary'),
+        borderColor: theme.colors.primary.DEFAULT,
+        boxShadow: 'none',
       };
     case 'success':
       return {
         ...base,
-        background: theme.gradients.success,
+        background: theme.colors.success.DEFAULT,
         color: theme.colors.text.inverse,
-        boxShadow: getShadow('success'),
+        borderColor: theme.colors.success.DEFAULT,
+        boxShadow: 'none',
       };
     case 'error':
       return {
         ...base,
-        background: theme.gradients.error,
+        background: theme.colors.error.DEFAULT,
         color: theme.colors.text.inverse,
-        boxShadow: getShadow('error'),
+        borderColor: theme.colors.error.DEFAULT,
+        boxShadow: 'none',
       };
     case 'secondary':
       return {
         ...base,
-        background: theme.colors.background.overlay,
-        color: theme.colors.primary.DEFAULT,
-        boxShadow: getShadow('md'),
+        background: theme.colors.background.secondary,
+        color: theme.colors.text.primary,
+        borderColor: theme.colors.gray[300],
+        boxShadow: 'none',
       };
     case 'ghost':
       return {
         ...base,
         background: 'transparent',
         color: theme.colors.text.secondary,
+        borderColor: 'transparent',
       };
     default:
       return base;
@@ -123,12 +127,12 @@ export const buttonVariant = (
 };
 
 /**
- * Create input style
+ * Create input style - minimal, clean
  */
 export const inputStyle = (): CSSProperties => ({
   padding: `${getSpacing('sm')} ${getSpacing('md')}`,
-  border: `2px solid ${theme.colors.gray[200]}`,
-  borderRadius: getRadius('lg'),
+  border: `1px solid ${theme.colors.gray[300]}`,
+  borderRadius: getRadius('md'),
   fontSize: theme.typography.fontSize.base,
   transition: `all ${theme.transitions.default}`,
   background: theme.colors.background.primary,
@@ -137,12 +141,12 @@ export const inputStyle = (): CSSProperties => ({
 });
 
 /**
- * Create focus style
+ * Create focus style - subtle, accessible
  */
 export const focusStyle = (): CSSProperties => ({
   outline: 'none',
-  borderColor: theme.colors.primary.DEFAULT,
-  boxShadow: `0 0 0 3px ${theme.colors.primary[100]}`,
+  borderColor: theme.colors.accent.DEFAULT,
+  boxShadow: `0 0 0 3px rgba(2, 132, 199, 0.1)`,
 });
 
 /**

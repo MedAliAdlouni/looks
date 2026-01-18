@@ -62,12 +62,12 @@ export default function Dashboard() {
     margin: `0 0 ${theme.spacing.xs} 0`,
     fontSize: theme.typography.fontSize['2xl'],
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.text.inverse,
+    color: theme.colors.text.primary,
   };
 
   const sectionSubtitleStyle: CSSProperties = {
     margin: 0,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.sm,
   };
 

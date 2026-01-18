@@ -75,8 +75,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  background-attachment: fixed;
+  background: #fafafa;
   color: var(--text-primary);
   line-height: 1.6;
 }
@@ -164,21 +163,21 @@ html {
   animation: slideIn 0.3s ease-out;
 }
 
-/* Document card hover effect */
+/* Document card hover effect - minimal */
 .document-card-hover:hover {
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%) !important;
-  border-color: var(--primary) !important;
-  box-shadow: var(--shadow-lg) !important;
-  transform: translateY(-2px) !important;
+  background: var(--bg-secondary) !important;
+  border-color: var(--gray-300) !important;
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-1px) !important;
   transition: all var(--transition) !important;
 }
 
-/* Input focus states */
+/* Input focus states - minimal */
 input:focus,
 textarea:focus {
   outline: none;
-  border-color: #667eea !important;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+  border-color: var(--gray-400) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Button hover effects */

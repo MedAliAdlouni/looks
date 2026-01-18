@@ -91,16 +91,16 @@ export const DocumentCard: React.FC<DocumentCardProps> = ({ document, onClick, i
 
   const statusBadgeStyle: CSSProperties = {
     padding: `${theme.spacing.xs} ${theme.spacing.sm}`,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.sm,
     fontSize: theme.typography.fontSize.xs,
-    fontWeight: theme.typography.fontWeight.semibold,
+    fontWeight: theme.typography.fontWeight.medium,
     ...(isCompleted
       ? {
-          background: 'rgba(16, 185, 129, 0.1)',
+          background: theme.colors.success.light,
           color: theme.colors.success.dark,
         }
       : {
-          background: 'rgba(245, 158, 11, 0.1)',
+          background: theme.colors.warning.light,
           color: theme.colors.warning.dark,
         }),
   };

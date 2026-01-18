@@ -51,7 +51,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
       };
 
   const textStyle: CSSProperties = {
-    color: fullScreen ? theme.colors.text.inverse : theme.colors.text.secondary,
+    color: theme.colors.text.secondary,
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.medium,
   };

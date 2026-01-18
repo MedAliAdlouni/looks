@@ -37,8 +37,7 @@ export const TopActionBar: React.FC<TopActionBarProps> = ({
 
   const barStyle: CSSProperties = {
     height: '64px',
-    background: theme.colors.background.overlay,
-    backdropFilter: 'blur(10px)',
+    background: theme.colors.background.primary,
     borderBottom: `1px solid ${theme.colors.gray[200]}`,
     display: 'flex',
     alignItems: 'center',
@@ -67,25 +66,23 @@ export const TopActionBar: React.FC<TopActionBarProps> = ({
   };
 
   const actionButtonStyle: CSSProperties = {
-    padding: '0.75rem 1.25rem',
-    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    color: 'white',
+    padding: `${theme.spacing.sm} ${theme.spacing.lg}`,
+    background: theme.colors.success.DEFAULT,
+    color: theme.colors.text.inverse,
     border: 'none',
-    borderRadius: '0.75rem',
+    borderRadius: theme.borderRadius.md,
     cursor: 'pointer',
-    fontSize: '0.875rem',
-    fontWeight: '600',
-    transition: 'all 0.2s',
-    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.medium,
+    transition: `all ${theme.transitions.default}`,
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem',
+    gap: theme.spacing.sm,
   };
 
   const assessmentsButtonStyle: CSSProperties = {
     ...actionButtonStyle,
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+    background: theme.colors.primary.DEFAULT,
   };
 
   return (
@@ -100,40 +97,22 @@ export const TopActionBar: React.FC<TopActionBarProps> = ({
       </div>
       <div style={rightSectionStyle}>
         {onChatClick && !chatSidebarOpen && (
-          <button
+          <Button
+            variant="success"
+            size="sm"
             onClick={onChatClick}
-            style={actionButtonStyle}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.5)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
-            }}
             title="Open chat to ask questions about course materials"
           >
             💬 Chat About Course
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={handleAssessmentsClick}
-          style={assessmentsButtonStyle}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)';
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-          }}
         >
           📝 Assessments
-        </button>
+        </Button>
       </div>
     </div>
   );

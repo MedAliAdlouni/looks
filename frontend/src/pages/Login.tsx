@@ -60,10 +60,7 @@ export default function Login() {
     marginBottom: theme.spacing.sm,
     fontSize: theme.typography.fontSize['3xl'],
     fontWeight: theme.typography.fontWeight.bold,
-    background: theme.gradients.text,
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    backgroundClip: 'text',
+    color: theme.colors.text.primary,
   };
 
   const subtitleStyle: CSSProperties = {

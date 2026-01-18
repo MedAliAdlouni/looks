@@ -27,8 +27,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
 }) => {
   const containerStyle: CSSProperties = {
     minHeight: '100vh',
-    background: theme.gradients.background,
-    backgroundAttachment: 'fixed',
+    background: theme.colors.background.secondary,
     display: 'flex',
     flexDirection: 'column',
   };

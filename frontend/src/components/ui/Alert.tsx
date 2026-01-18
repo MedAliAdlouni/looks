@@ -24,23 +24,23 @@ export const Alert: React.FC<AlertProps> = ({
 }) => {
   const variantStyles: Record<string, CSSProperties> = {
     success: {
-      background: theme.gradients.success,
-      color: theme.colors.text.inverse,
-      border: `1px solid ${theme.colors.success.dark}`,
+      background: theme.colors.success.light,
+      color: theme.colors.success.dark,
+      border: `1px solid ${theme.colors.success.DEFAULT}`,
     },
     error: {
-      background: theme.gradients.error,
-      color: theme.colors.text.inverse,
-      border: `1px solid ${theme.colors.error.dark}`,
+      background: theme.colors.error.light,
+      color: theme.colors.error.dark,
+      border: `1px solid ${theme.colors.error.DEFAULT}`,
     },
     warning: {
-      background: theme.gradients.warning,
-      color: theme.colors.text.inverse,
-      border: `1px solid ${theme.colors.warning.dark}`,
+      background: theme.colors.warning.light,
+      color: theme.colors.warning.dark,
+      border: `1px solid ${theme.colors.warning.DEFAULT}`,
     },
     info: {
-      background: `linear-gradient(135deg, ${theme.colors.info.light} 0%, ${theme.colors.info.DEFAULT} 100%)`,
-      color: theme.colors.text.primary,
+      background: theme.colors.info.light,
+      color: theme.colors.info.dark,
       border: `1px solid ${theme.colors.info.DEFAULT}`,
     },
   };

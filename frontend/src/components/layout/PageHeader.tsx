@@ -78,7 +78,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     width: '40px',
     height: '40px',
     borderRadius: theme.borderRadius.full,
-    background: theme.gradients.primary,
+    background: theme.colors.primary.DEFAULT,
     color: theme.colors.text.inverse,
     display: 'flex',
     alignItems: 'center',
