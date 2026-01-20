@@ -172,6 +172,19 @@ html {
   transition: all var(--transition) !important;
 }
 
+/* Input and textarea base styles - consistent left padding for placeholders */
+/* This ensures placeholder text aligns with user-typed text and has proper spacing from the left edge */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+textarea {
+  padding-left: 0.75rem;
+}
+
 /* Input focus states - minimal */
 input:focus,
 textarea:focus {

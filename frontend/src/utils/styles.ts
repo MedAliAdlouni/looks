@@ -128,9 +128,13 @@ export const buttonVariant = (
 
 /**
  * Create input style - minimal, clean
+ * Ensures consistent left padding so placeholder text aligns with user-typed text
  */
 export const inputStyle = (): CSSProperties => ({
-  padding: `${getSpacing('sm')} ${getSpacing('md')}`,
+  paddingTop: getSpacing('sm'),
+  paddingBottom: getSpacing('sm'),
+  paddingLeft: '0.75rem', // Consistent left padding for premium aesthetic
+  paddingRight: getSpacing('md'),
   border: `1px solid ${theme.colors.gray[300]}`,
   borderRadius: getRadius('md'),
   fontSize: theme.typography.fontSize.base,
