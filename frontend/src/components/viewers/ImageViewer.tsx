@@ -403,7 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    transition: zoom => zoom === 1 ? 'transform 0.2s' : 'none',
+    transition: 'transform 0.2s',
   },
   image: {
     maxWidth: '100%',

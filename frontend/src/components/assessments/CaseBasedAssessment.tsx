@@ -41,7 +41,7 @@ export default function CaseBasedAssessment({ courseId }: CaseBasedAssessmentPro
     const persisted = loadQuestionSet(courseId, 'case-based', setId);
     if (persisted) {
       const state = persisted as PersistedCaseBasedState;
-      setCases(state.cases);
+      setCases(state.cases as CaseBasedResponse[]);
       setCurrentCaseIndex(state.currentCaseIndex || 0);
       setCurrentQuestionIndex(state.currentQuestionIndex || 0);
       setMcqAnswers(state.mcqAnswers || []);

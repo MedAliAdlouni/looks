@@ -25,7 +25,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ role, content, sou
     boxShadow: theme.shadows.md,
     ...(isUser
       ? {
-          background: theme.gradients.primary,
+          background: `linear-gradient(135deg, ${theme.colors.accent[500]}, ${theme.colors.accent[600]})`,
           color: theme.colors.text.inverse,
           alignSelf: 'flex-end',
         }
