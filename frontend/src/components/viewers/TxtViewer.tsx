@@ -116,7 +116,6 @@ export default function TxtViewer({ document, courseId, course, onClose, variant
         conversation_id: conversationId || undefined,
         mode: responseMode,
         verbosity,
-        document_id: document.id,
       });
 
       // Update conversation ID if this is a new conversation
