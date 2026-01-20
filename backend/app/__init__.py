@@ -6,7 +6,10 @@ import logging
 import sys
 import time
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from app.api import auth, courses, documents, chat, document_viewers, assessment
+from app.config.api import api_config
 
 # Configure logging - but don't override uvicorn's configuration
 # Only configure if logging hasn't been configured yet
@@ -30,6 +33,51 @@ app = FastAPI(
     title="Curriculum-Aligned AI Tutor API",
     description="Backend API for the AI tutoring platform",
     version="1.0.0",
+)
+
+# CORS configuration
+# For production, set CORS_ORIGINS environment variable to your frontend URL(s)
+# Example: CORS_ORIGINS='["https://your-frontend.onrender.com"]'
+cors_origins = api_config.CORS_ORIGINS
+# FastAPI doesn't allow credentials with "*" origin, so disable it when using "*"
+# For authentication to work properly, set specific origins instead of "*"
+use_wildcard = isinstance(cors_origins, list) and "*" in cors_origins
+
+# Middleware to handle OPTIONS requests BEFORE routing (must be first)
+@app.middleware("http")
+async def handle_options_middleware(request: Request, call_next):
+    """Handle OPTIONS requests for CORS preflight before routing."""
+    if request.method == "OPTIONS":
+        origin = request.headers.get("origin", "*")
+        response = Response(status_code=200)
+        
+        # Determine allowed origin
+        if "*" in cors_origins:
+            allow_origin = "*"
+        elif origin in cors_origins:
+            allow_origin = origin
+        elif cors_origins:
+            allow_origin = cors_origins[0]
+        else:
+            allow_origin = "*"
+        
+        response.headers["Access-Control-Allow-Origin"] = allow_origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Allow-Credentials"] = "true" if not use_wildcard else "false"
+        response.headers["Access-Control-Max-Age"] = "3600"
+        return response
+    
+    return await call_next(request)
+
+# Add CORS middleware - MUST be before routers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=not use_wildcard,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 @app.on_event("startup")
