@@ -91,60 +91,6 @@ async def startup_event():
     print("STARTUP: Logging test - if you see this, stderr is working", file=sys.stderr, flush=True)
     print("=" * 60, file=sys.stderr, flush=True)
     
-    # Run database migrations
-    try:
-        from alembic.config import Config
-        from alembic import context
-        from sqlalchemy import pool
-        from sqlalchemy.ext.asyncio import async_engine_from_config
-        from app.config.database import db_config
-        from app.db import Base
-        import os
-        
-        # Get the path to alembic.ini (should be in the backend directory)
-        alembic_ini_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini")
-        
-        if os.path.exists(alembic_ini_path):
-            alembic_cfg = Config(alembic_ini_path)
-            
-            # Get database URL and convert to asyncpg format
-            database_url = db_config.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
-            alembic_cfg.set_main_option("sqlalchemy.url", database_url)
-            
-            # Create async engine
-            configuration = alembic_cfg.get_section(alembic_cfg.config_ini_section)
-            engine = async_engine_from_config(
-                configuration,
-                prefix="sqlalchemy.",
-                poolclass=pool.NullPool,
-            )
-            
-            # Run migrations using async connection
-            def do_run_migrations(connection):
-                """Run migrations with connection (sync function for run_sync)."""
-                # Set the config on context so it can find migration scripts
-                context.config = alembic_cfg
-                context.configure(
-                    connection=connection,
-                    target_metadata=Base.metadata,
-                )
-                with context.begin_transaction():
-                    context.run_migrations()
-            
-            async with engine.begin() as connection:
-                await connection.run_sync(do_run_migrations)
-            
-            await engine.dispose()
-            logger.info("Database migrations completed successfully")
-        else:
-            logger.warning(f"Alembic config not found at {alembic_ini_path}, skipping migrations")
-    except Exception as e:
-        logger.error(f"Failed to run database migrations: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        logger.error("Application will continue, but database may not be up to date")
-        # Don't fail startup - let the app run and handle errors at runtime
-    
     # Initialize Pinecone index at startup to avoid first-request delay
     try:
         from app.services.integrations.pinecone_store import init_index
