@@ -7,7 +7,7 @@ class ServiceConfig(BaseSettings):
     """Configuration for services."""
 
     # Embedding service
-    EMBEDDING_MODEL: str = "models/text-embedding-004"
+    EMBEDDING_MODEL: str = "models/gemini-embedding-001"
     EMBEDDING_TASK_TYPE: str = "RETRIEVAL_DOCUMENT"
     EMBEDDING_BATCH_SIZE: int = 100
     EMBEDDING_MAX_RETRIES: int = 3
@@ -19,7 +19,7 @@ class ServiceConfig(BaseSettings):
     CHUNK_OVERLAP: int = 100  # tokens
 
     # Vector service
-    VECTOR_DIMENSION: int = 768  # text-embedding-004 outputs 768 dimensions by default
+    VECTOR_DIMENSION: int = 768  # gemini-embedding-001 supports up to 3072, but using 768 for compatibility
     VECTOR_BATCH_SIZE: int = 100
     VECTOR_METRIC: str = "cosine"
     VECTOR_REGION: str = "us-east-1"

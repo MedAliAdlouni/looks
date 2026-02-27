@@ -11,7 +11,7 @@ import uuid
 
 from google import genai
 from google.genai import types
-from google.genai.errors import ClientError
+from google.genai.errors import ClientError, ServerError
 
 from app.services.integrations.embeddings import create_embedding
 from app.services.integrations.pinecone_store import query_vectors
@@ -144,13 +144,57 @@ async def generate_case_based(
 
         return cases
 
+    except ServerError as e:
+        # Handle server-side errors (503, 500, etc.)
+        error_str = str(e).lower()
+        status_code = getattr(e, 'status_code', None)
+        
+        if status_code == 503 or "overloaded" in error_str or "unavailable" in error_str:
+            logger.warning(f"Gemini API is overloaded (503): {e}")
+            raise RuntimeError(
+                "The AI model service is temporarily overloaded. Please wait a moment and try again."
+            ) from e
+        elif status_code == 500:
+            logger.error(f"Gemini API server error (500): {e}")
+            raise RuntimeError(
+                "The AI service encountered an internal error. Please try again in a few moments."
+            ) from e
+        else:
+            logger.error(f"Gemini API server error ({status_code}): {e}")
+            raise RuntimeError(
+                f"The AI service is experiencing issues. Please try again later. Error: {str(e)}"
+            ) from e
+    except ClientError as e:
+        # Handle client-side errors (400, 401, 403, 429, etc.)
+        error_str = str(e).lower()
+        status_code = getattr(e, 'status_code', None)
+        
+        if "quota" in error_str or "rate limit" in error_str or status_code == 429:
+            raise RuntimeError(
+                "API quota or rate limit exceeded. Please check your Gemini API quota or try again later."
+            ) from e
+        elif status_code == 403 or "forbidden" in error_str:
+            raise RuntimeError(
+                "API access forbidden. Please check your Gemini API key and permissions."
+            ) from e
+        elif status_code == 401 or "unauthorized" in error_str:
+            raise RuntimeError(
+                "API authentication failed. Please check your Gemini API key."
+            ) from e
+        else:
+            logger.error(f"Gemini API client error ({status_code}): {e}")
+            raise RuntimeError(f"Failed to generate case-based assessment: {e}") from e
     except Exception as e:
         logger.exception("Case-based generation failed")
-        # Check for specific API errors
+        # Check for specific API errors in string representation
         error_str = str(e).lower()
         if "quota" in error_str or "rate limit" in error_str or "429" in error_str:
             raise RuntimeError(
                 "API quota or rate limit exceeded. Please check your Gemini API quota or try again later."
+            ) from e
+        elif "503" in error_str or "overloaded" in error_str or "unavailable" in error_str:
+            raise RuntimeError(
+                "The AI model service is temporarily overloaded. Please wait a moment and try again."
             ) from e
         elif "403" in error_str or "forbidden" in error_str:
             raise RuntimeError(

@@ -303,11 +303,19 @@ async def generate_mcq_endpoint(
         )
     except RuntimeError as e:
         error_msg = str(e)
+        error_lower = error_msg.lower()
         # Check if it's a quota/rate limit error
-        if "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+        if "quota" in error_lower or "rate limit" in error_lower:
             logger.error(f"API quota/rate limit error: {error_msg}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=error_msg,
+            )
+        # Check if it's a service unavailable/overloaded error
+        elif "overloaded" in error_lower or "temporarily" in error_lower or "unavailable" in error_lower:
+            logger.warning(f"AI service overloaded: {error_msg}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=error_msg,
             )
         else:
@@ -431,11 +439,19 @@ async def generate_open_ended_question_endpoint(
         )
     except RuntimeError as e:
         error_msg = str(e)
+        error_lower = error_msg.lower()
         # Check if it's a quota/rate limit error
-        if "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+        if "quota" in error_lower or "rate limit" in error_lower:
             logger.error(f"API quota/rate limit error: {error_msg}", exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=error_msg,
+            )
+        # Check if it's a service unavailable/overloaded error
+        elif "overloaded" in error_lower or "temporarily" in error_lower or "unavailable" in error_lower:
+            logger.warning(f"AI service overloaded: {error_msg}", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=error_msg,
             )
         else:
